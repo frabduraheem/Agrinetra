@@ -61,9 +61,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          //padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Center(
           child: Form(
             key: _formKey,
             child: ConstrainedBox(
