@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:agrinetra/widgets/map.dart';
+import 'package:latlong2/latlong.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -14,29 +16,61 @@ class _RegistrationPageState extends State<RegistrationPage> {
   // Cultivation Status Variables
   bool _isCultivating = false;
   bool _hasMultipleCrops = false;
-  String _cropIntegrationType = 'Integrated'; // Options: 'Integrated', 'Separated'
+  String _cropIntegrationType =
+      'Integrated'; // Options: 'Integrated', 'Separated'
 
   // List to hold details for multiple crops
   List<Map<String, String>> _cropDetails = [
-    {'cropName': '', 'sowingDate': '', 'harvestDate': ''}
+    {'cropName': '', 'sowingDate': '', 'harvestDate': ''},
   ];
+  List<LatLng> _landBoundary = [];
 
   // Placeholder function for map drawing/data
-  void _openMapForBoundaryDrawing() {
-    // TODO: Implement navigation to a map view using Google Maps/Leaflet
-    // and collect the boundary coordinates (Polygon/MultiPolygon GeoJSON).
-    // The result should update a state variable like _landBoundaries.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening map for land boundary drawing... (API integration required)')),
+  void _openMapForBoundaryDrawing() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) =>
+                const MapDrawingScreen(title: "Draw Main Land Boundary"),
+      ),
     );
+
+    if (result != null && result is List<LatLng>) {
+      setState(() {
+        _landBoundary = result;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Main boundary saved with ${_landBoundary.length} points!',
+          ),
+        ),
+      );
+    }
   }
 
-  // Placeholder function for sub-plot drawing
-  void _openMapForSubPlotDrawing(int index) {
-    // TODO: Implement navigation to draw the boundary for a specific crop/sub-plot.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening map for crop ${index + 1} sub-plot boundary...')),
+  void _openMapForSubPlotDrawing(int index) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) =>
+                MapDrawingScreen(title: "Draw Boundary for Crop ${index + 1}"),
+      ),
     );
+
+    if (result != null && result is List<LatLng>) {
+      // TODO: You would store the result in a more complex state structure
+      // that associates the boundary with the specific crop in _cropDetails list.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Crop ${index + 1} sub-boundary saved with ${result.length} points!',
+          ),
+        ),
+      );
+    }
   }
 
   void _register() {
@@ -72,10 +106,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // --- Account Details ---
-                  Text(
-                    "Account Setup",
-                    style: theme.textTheme.headlineSmall,
-                  ),
+                  Text("Account Setup", style: theme.textTheme.headlineSmall),
                   const Divider(),
                   TextFormField(
                     decoration: const InputDecoration(
@@ -84,8 +115,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Please enter your email.' : null,
+                    validator:
+                        (value) =>
+                            value == null || value.isEmpty
+                                ? 'Please enter your email.'
+                                : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -95,9 +129,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       hintText: "••••••••",
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) =>
-                        value == null || value.isEmpty || value.length < 8 ? 'Password must be at least 8 characters.' : null,
-                    onSaved: (value) => print('Password saved'), // Don't actually save in real app
+                    validator:
+                        (value) =>
+                            value == null || value.isEmpty || value.length < 8
+                                ? 'Password must be at least 8 characters.'
+                                : null,
+                    onSaved:
+                        (value) => print(
+                          'Password saved',
+                        ), // Don't actually save in real app
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -125,16 +165,30 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   ),
                   const Divider(),
                   const Text(
-                      "Use the map tool to draw the boundary of your land (multiple disconnected plots are allowed)."),
+                    "Use the map tool to draw the boundary of your land (multiple disconnected plots are allowed).",
+                  ),
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _openMapForBoundaryDrawing,
-                      icon: const Icon(Icons.map),
-                      label: const Text("Draw Land Boundary on Map"),
+                      icon: Icon(
+                        _landBoundary.isEmpty
+                            ? Icons.map
+                            : Icons.edit_location_alt,
+                      ),
+                      label: Text(
+                        _landBoundary.isEmpty
+                            ? "Draw Land Boundary on Map"
+                            : "Boundary Set (${_landBoundary.length} points). Tap to Edit.",
+                      ),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor:
+                            _landBoundary.isEmpty
+                                ? theme.colorScheme.primary
+                                : Colors.green.shade600,
+                        foregroundColor: theme.colorScheme.onPrimary,
                       ),
                     ),
                   ),
@@ -158,7 +212,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             if (!value) {
                               _hasMultipleCrops = false;
                               _cropDetails = [
-                                {'cropName': '', 'sowingDate': '', 'harvestDate': ''}
+                                {
+                                  'cropName': '',
+                                  'sowingDate': '',
+                                  'harvestDate': '',
+                                },
                               ];
                             }
                           });
@@ -166,7 +224,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       ),
                     ],
                   ),
-                  
+
                   // --- Conditional Cultivation Details ---
                   if (_isCultivating) ...[
                     const SizedBox(height: 16),
@@ -183,12 +241,20 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               if (value) {
                                 // Ensure at least two crop entries when multiple is selected
                                 if (_cropDetails.length < 2) {
-                                  _cropDetails.add({'cropName': '', 'sowingDate': '', 'harvestDate': ''});
+                                  _cropDetails.add({
+                                    'cropName': '',
+                                    'sowingDate': '',
+                                    'harvestDate': '',
+                                  });
                                 }
                               } else {
                                 // Reset to a single crop entry
                                 _cropDetails = [
-                                  {'cropName': '', 'sowingDate': '', 'harvestDate': ''}
+                                  {
+                                    'cropName': '',
+                                    'sowingDate': '',
+                                    'harvestDate': '',
+                                  },
                                 ];
                               }
                             });
@@ -235,7 +301,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     const SizedBox(height: 24),
                     Text(
                       "Crop Details and Schedule",
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
 
@@ -252,17 +320,27 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             children: [
                               Text(
                                 "Crop Plot ${index + 1}",
-                                style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.secondary),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                ),
                               ),
-                              if (_hasMultipleCrops && _cropIntegrationType == 'Separated')
+                              if (_hasMultipleCrops &&
+                                  _cropIntegrationType == 'Separated')
                                 Padding(
-                                  padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+                                  padding: const EdgeInsets.only(
+                                    top: 8.0,
+                                    bottom: 8.0,
+                                  ),
                                   child: SizedBox(
                                     width: double.infinity,
                                     child: OutlinedButton.icon(
-                                      onPressed: () => _openMapForSubPlotDrawing(index),
+                                      onPressed:
+                                          () =>
+                                              _openMapForSubPlotDrawing(index),
                                       icon: const Icon(Icons.crop_square),
-                                      label: const Text("Draw Cultivated Boundary"),
+                                      label: const Text(
+                                        "Draw Cultivated Boundary",
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -272,7 +350,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                   labelText: "Crop Name",
                                   hintText: "e.g., Rice, Maize",
                                 ),
-                                onChanged: (value) => cropData['cropName'] = value,
+                                onChanged:
+                                    (value) => cropData['cropName'] = value,
                               ),
                               const SizedBox(height: 12),
                               TextFormField(
@@ -283,7 +362,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 ),
                                 keyboardType: TextInputType.datetime,
                                 onTap: () async {
-                                  FocusScope.of(context).requestFocus(FocusNode());
+                                  FocusScope.of(
+                                    context,
+                                  ).requestFocus(FocusNode());
                                   DateTime? picked = await showDatePicker(
                                     context: context,
                                     initialDate: DateTime.now(),
@@ -292,7 +373,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                   );
                                   if (picked != null) {
                                     setState(() {
-                                      cropData['sowingDate'] = picked.toString().split(' ')[0];
+                                      cropData['sowingDate'] =
+                                          picked.toString().split(' ')[0];
                                     });
                                   }
                                 },
@@ -301,21 +383,27 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               TextFormField(
                                 initialValue: cropData['harvestDate'],
                                 decoration: const InputDecoration(
-                                  labelText: "Expected Harvest Date (YYYY-MM-DD)",
+                                  labelText:
+                                      "Expected Harvest Date (YYYY-MM-DD)",
                                   hintText: "e.g., 2025-10-30",
                                 ),
                                 keyboardType: TextInputType.datetime,
                                 onTap: () async {
-                                  FocusScope.of(context).requestFocus(FocusNode());
+                                  FocusScope.of(
+                                    context,
+                                  ).requestFocus(FocusNode());
                                   DateTime? picked = await showDatePicker(
                                     context: context,
-                                    initialDate: DateTime.now().add(const Duration(days: 90)),
+                                    initialDate: DateTime.now().add(
+                                      const Duration(days: 90),
+                                    ),
                                     firstDate: DateTime(2000),
                                     lastDate: DateTime(2030),
                                   );
                                   if (picked != null) {
                                     setState(() {
-                                      cropData['harvestDate'] = picked.toString().split(' ')[0];
+                                      cropData['harvestDate'] =
+                                          picked.toString().split(' ')[0];
                                     });
                                   }
                                 },
@@ -324,7 +412,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton.icon(
-                                    icon: const Icon(Icons.remove_circle_outline),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
                                     label: const Text('Remove Crop'),
                                     onPressed: () {
                                       setState(() {
@@ -347,7 +437,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           label: const Text('Add Another Crop'),
                           onPressed: () {
                             setState(() {
-                              _cropDetails.add({'cropName': '', 'sowingDate': '', 'harvestDate': ''});
+                              _cropDetails.add({
+                                'cropName': '',
+                                'sowingDate': '',
+                                'harvestDate': '',
+                              });
                             });
                           },
                         ),
@@ -382,7 +476,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             ),
           ),
         ),
-      )
+      ),
     );
   }
 }
