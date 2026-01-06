@@ -22,6 +22,7 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
   List<LatLng> _polygonPoints = [];
   LatLng? _selectedPoint;
   bool _hasChanges = false;
+  bool _hasSelection = false;
   // Default camera position (e.g., a reasonable starting point)
   static final LatLng _initialCenter = LatLng(
     10.8505,
@@ -58,31 +59,49 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
   }
 
   void _handleTap(TapPosition tapPosition, LatLng point) {
-    setState(() {
-      _hasChanges = true;
-
-      // 1. Check if the tap is near an existing marker to select it
-      // Simple distance check logic:
-      bool foundSelection = false;
-      for (var existingPoint in _polygonPoints) {
-        final distance = const Distance().as(
-          LengthUnit.Meter,
-          point,
-          existingPoint,
-        );
-        // If tap is within 5 meters (adjust this tolerance as needed)
-        if (distance < 10) {
-          _selectedPoint = existingPoint;
-          foundSelection = true;
-          break;
+    if (_selectedPoint != null) {
+      setState(() {
+        _hasChanges = true;
+        // Find the index of the selected point and replace it with the new location
+        final index = _polygonPoints.indexOf(_selectedPoint!);
+        if (index != -1) {
+          _polygonPoints[index] = point;
+          _selectedPoint = point; // Update selected point reference
         }
-      }
-      // 2. If no existing point was tapped, add a new point
-      if (!foundSelection) {
-        _selectedPoint = null; // Deselect any previous point
-        _polygonPoints.add(point);
-      }
-    });
+      });
+      _selectedPoint = null;
+    } else {
+      setState(() {
+        _hasChanges = true;
+
+        // 1. Check if the tap is near an existing marker to select it
+        // Simple distance check logic:
+        bool foundSelection = false;
+        for (var existingPoint in _polygonPoints) {
+          final distance = const Distance().as(
+            LengthUnit.Meter,
+            point,
+            existingPoint,
+          );
+          // If tap is within 5 meters (adjust this tolerance as needed)
+          if (distance < 10) {
+            _selectedPoint = existingPoint;
+            foundSelection = true;
+            _hasSelection = true;
+            break;
+          }
+        }
+        // 2. If no existing point was tapped, add a new point
+        if (!foundSelection) {
+          if (_hasSelection) {
+            _hasSelection = false;
+          } else {
+            _polygonPoints.add(point);
+          }
+          _selectedPoint = null; // Deselect any previous point
+        }
+      });
+    }
   }
 
   // Function to move a pin to a different position in the sequence
@@ -127,8 +146,8 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
               ),
               actions: <Widget>[
                 TextButton(
-                  onPressed:
-                      () => Navigator.of(context).pop(true), // Discard changes
+                  onPressed: () =>
+                      Navigator.of(context).pop(true), // Discard changes
                   child: const Text('DISCARD'),
                 ),
                 if (saveBoundary)
@@ -200,8 +219,9 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
             ),
             // Save button is now ALWAYS VISIBLE
             TextButton(
-              onPressed:
-                  canSave ? _saveAndExit : null, // Disabled if can't save
+              onPressed: canSave
+                  ? _saveAndExit
+                  : null, // Disabled if can't save
               child: Text(
                 'SAVE',
                 style: TextStyle(
@@ -234,10 +254,9 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
               mapController: _mapController,
               options: MapOptions(
                 // --- FIX 1: Enable Zoom Out ---
-                initialCenter:
-                    widget.initialPoints.isNotEmpty
-                        ? widget.initialPoints.first
-                        : _initialCenter,
+                initialCenter: widget.initialPoints.isNotEmpty
+                    ? widget.initialPoints.first
+                    : _initialCenter,
                 initialZoom: 10,
                 // Ensure all zoom levels are allowed
                 minZoom: 1,
@@ -270,36 +289,34 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
 
                 // Marker Layer
                 MarkerLayer(
-                  markers:
-                      _polygonPoints.asMap().entries.map((entry) {
-                        int index = entry.key;
-                        LatLng point = entry.value;
+                  markers: _polygonPoints.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    LatLng point = entry.value;
 
-                        final bool isSelected = point == _selectedPoint;
+                    final bool isSelected = point == _selectedPoint;
 
-                        return Marker(
-                          width: 40.0, // Larger tap target
-                          height: 40.0,
-                          point: point,
-                          child: GestureDetector(
-                            onTap: () {
-                              // Allow explicit pin selection by tapping the marker
-                              setState(() {
-                                _selectedPoint = point;
-                              });
-                            },
-                            child: Icon(
-                              Icons.location_pin,
-                              // Highlight the selected pin
-                              color:
-                                  isSelected
-                                      ? Colors.amber.shade700
-                                      : Colors.green.shade700,
-                              size: isSelected ? 40 : 35,
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                    return Marker(
+                      width: 40.0, // Larger tap target
+                      height: 40.0,
+                      point: point,
+                      child: GestureDetector(
+                        onTap: () {
+                          // Allow explicit pin selection by tapping the marker
+                          setState(() {
+                            _selectedPoint = point;
+                          });
+                        },
+                        child: Icon(
+                          Icons.location_pin,
+                          // Highlight the selected pin
+                          color: isSelected
+                              ? Colors.amber.shade700
+                              : Colors.green.shade700,
+                          size: isSelected ? 40 : 35,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
