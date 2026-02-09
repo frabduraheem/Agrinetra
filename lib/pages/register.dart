@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -14,15 +15,31 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _email;
   String? _password;
 
-  void _register() {
+  final _authService = AuthService();
+  bool _isLoading = false;
+
+  Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      // TODO: Implement registration logic, send data to backend
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration Successful!')),
-      );
-      // Example navigation after successful registration
-      Navigator.pushReplacementNamed(context, '/login');
+      setState(() => _isLoading = true);
+      try {
+        await _authService.registerWithEmail(_email!, _password!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registration Successful!')),
+          );
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      } catch (e) {
+        if (mounted) {
+          String message = AuthService.handleException(e);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 

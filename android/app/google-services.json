@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "369768559517",
+    "project_id": "agrinetra-fjns-2026",
+    "storage_bucket": "agrinetra-fjns-2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:369768559517:android:174b0df648b557b9eaf574",
+        "android_client_info": {
+          "package_name": "com.example.agrinetra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC22o6CJC94xqtwxzoakqxaUvq-qSCdT0E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
