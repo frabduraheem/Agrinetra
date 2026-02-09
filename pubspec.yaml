@@ -37,7 +37,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_map: ^6.1.0 # Use the latest version
   # Required for displaying OpenStreetMap tiles
-  latlong2: ^0.9.1
+  uuid: ^4.3.3
+  turf: ^0.0.10
+  clipper2: ^0.0.3
 
 dev_dependencies:
   flutter_test:

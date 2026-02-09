@@ -7,11 +7,13 @@ import 'package:http/http.dart' as http;
 class MapDrawingScreen extends StatefulWidget {
   final String title;
   final List<LatLng> initialPoints;
+  final List<List<LatLng>> existingPolygons;
 
   const MapDrawingScreen({
     super.key,
     required this.title,
     this.initialPoints = const [],
+    this.existingPolygons = const [],
   });
 
   @override
@@ -288,6 +290,16 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
                     userAgentPackageName: 'com.example.app',
                   ),
                 ],
+                // Existing Polygons Layer
+                PolygonLayer(
+                  polygons: widget.existingPolygons.map((points) => Polygon(
+                    points: points,
+                    color: Colors.red.withOpacity(0.3), // Occupied area
+                    borderColor: Colors.red,
+                    borderStrokeWidth: 2,
+                    isFilled: true,
+                  )).toList(),
+                ),
                 // Polygon Layer
                 PolygonLayer(
                   polygons: [
@@ -296,8 +308,7 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
                         points: _polygonPoints,
                         color: Colors.blue.withOpacity(0.5),
                         borderColor: Colors.blue.shade700,
-                        borderStrokeWidth:
-                            4, // Thicker border for better visibility
+                        borderStrokeWidth: 4, // Thicker border for better visibility
                         isFilled: true,
                       ),
                   ],

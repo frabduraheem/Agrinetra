@@ -7,13 +7,17 @@ import 'green_credits/green_credits_page.dart';
 import 'irrigation/irrigation_page.dart';
 import 'settings/settings_page.dart';
 
+import '../fields/field_management_page.dart';
+
 class DashboardLayout extends StatefulWidget {
   final Widget child;
   final String currentPage;
+  final bool enableScrolling;
 
   const DashboardLayout({
     required this.child,
     this.currentPage = 'Dashboard',
+    this.enableScrolling = true,
     super.key,
   });
 
@@ -28,6 +32,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
 
   final List<Map<String, dynamic>> _allFeatures = [
     {'name': 'Dashboard', 'icon': Icons.dashboard, 'page': 'Dashboard'},
+    {'name': 'Fields', 'icon': Icons.grid_on, 'page': 'Fields'}, // Added Fields
     {'name': 'Crop Health', 'icon': Icons.local_florist, 'page': 'Crop Health'},
     {'name': 'NDVI Map', 'icon': Icons.map, 'page': 'Crop Health'},
     {'name': 'Irrigation', 'icon': Icons.water_drop, 'page': 'Irrigation'},
@@ -89,6 +94,9 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     switch (page) {
       case 'Dashboard':
         destination = const DashboardPage();
+        break;
+      case 'Fields':
+        destination = const FieldManagementPage();
         break;
       case 'Crop Health':
         destination = const CropHealthPage();
@@ -172,6 +180,12 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                             Icons.dashboard,
                             'Dashboard',
                             widget.currentPage == 'Dashboard',
+                          ),
+                          _navItem(
+                            context,
+                            Icons.grid_on,
+                            'Fields',
+                            widget.currentPage == 'Fields',
                           ),
                           _navItem(
                             context,
@@ -284,10 +298,15 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                     ),
                     // Page Content
                     Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: widget.child,
-                      ),
+                      child: widget.enableScrolling
+                          ? SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: widget.child,
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: widget.child,
+                            ),
                     ),
                   ],
                 ),
