@@ -2,28 +2,28 @@ import 'package:latlong2/latlong.dart';
 
 class Crop {
   String name;
-  String sowingDate;
-  String harvestDate;
+  DateTime plantingDate;
+  DateTime harvestDate;
 
   Crop({
     required this.name,
-    required this.sowingDate,
+    required this.plantingDate,
     required this.harvestDate,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'sowingDate': sowingDate,
-      'harvestDate': harvestDate,
+      'plantingDate': plantingDate.toIso8601String(),
+      'harvestDate': harvestDate.toIso8601String(),
     };
   }
 
   factory Crop.fromJson(Map<String, dynamic> json) {
     return Crop(
       name: json['name'],
-      sowingDate: json['sowingDate'],
-      harvestDate: json['harvestDate'],
+      plantingDate: DateTime.parse(json['plantingDate']),
+      harvestDate: DateTime.parse(json['harvestDate']),
     );
   }
 }

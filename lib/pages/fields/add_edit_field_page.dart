@@ -15,13 +15,26 @@ class AddEditFieldPage extends StatefulWidget {
   State<AddEditFieldPage> createState() => _AddEditFieldPageState();
 }
 
+class _UiCrop {
+  Crop crop;
+  String? originalName; // null if new, otherwise the name loaded from backend
+  bool isNew;
+
+  _UiCrop({required this.crop, this.originalName, this.isNew = false});
+}
+
 class _AddEditFieldPageState extends State<AddEditFieldPage> {
   final _formKey = GlobalKey<FormState>();
   final FieldService _fieldService = FieldService();
   
   late String _name;
   List<LatLng> _boundary = [];
-  List<Crop> _crops = [];
+  List<_UiCrop> _uiCrops = [];
+  final List<String> _deletedCropNames = []; // Track crops to delete from backend
+  
+  List<String> _availableCrops = []; // Fetched from backend
+  bool _isLoadingCrops = false;
+
   bool _isCultivated = false;
 
   bool _isEditing = false;
@@ -30,18 +43,35 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
   @override
   void initState() {
     super.initState();
+    _fetchCropTypes();
+
     _isEditing = widget.field != null;
     if (_isEditing) {
       _fieldId = widget.field!.id;
       _name = widget.field!.name;
       _boundary = List.from(widget.field!.boundary);
-      _crops = List.from(widget.field!.crops);
+      // Map existing crops to UiCrops
+      _uiCrops = widget.field!.crops.map((c) => _UiCrop(
+        crop: Crop(name: c.name, plantingDate: c.plantingDate, harvestDate: c.harvestDate), // Deep copy
+        originalName: c.name,
+        isNew: false
+      )).toList();
       _isCultivated = widget.field!.isCultivated;
     } else {
       _name = '';
       _isCultivated = false;
-      // _crops.add(Crop(name: '', sowingDate: '', harvestDate: '')); // Don't add default crop initially
     }
+  }
+
+  Future<void> _fetchCropTypes() async {
+     setState(() => _isLoadingCrops = true);
+     final crops = await _fieldService.fetchAvailableCrops();
+     if (mounted) {
+       setState(() {
+         _availableCrops = crops;
+         _isLoadingCrops = false;
+       });
+     }
   }
 
   void _openMap() async {
@@ -69,6 +99,8 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
     }
   }
 
+  bool _isLoading = false;
+
   void _saveField() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
@@ -80,14 +112,24 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
       return;
     }
 
+    setState(() => _isLoading = true);
+
+    // 1. Prepare Field Object (without crops first, we sync them separately usually, 
+    //    but local model needs them for immediate UI update if we don't reload)
+    //    Actually, FieldService.addField uses this object to add to local list.
+    //    So we should populate it.
+    
+    final currentCrops = _uiCrops.map((u) => u.crop).toList();
+    
     final newField = Field(
       id: _fieldId ?? const Uuid().v4(),
       name: _name,
       boundary: _boundary,
-      crops: _isCultivated ? _crops : [], // Ensure crops are empty if not cultivated
+      crops: _isCultivated ? currentCrops : [],
       isCultivated: _isCultivated,
     );
-
+    
+    // 2. Save/Update Field (Plot)
     String? error;
     if (_isEditing) {
       error = await _fieldService.updateField(newField);
@@ -96,26 +138,92 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
     }
 
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red),
-      );
-    } else {
-      widget.onFinished(); // Call parent callback instead of popping
-      ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(content: Text(_isEditing ? 'Field updated' : 'Field added')),
-      );
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    // 3. Sync Crops (If Field Saved Successfully)
+    String? cropError = await _syncCrops(newField.id); // Debug prints removed
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      
+      if (cropError != null) {
+         showDialog(
+           context: context,
+           builder: (ctx) => AlertDialog(
+             title: const Text("Crop Sync Failed"),
+             content: Text("Field saved, but crops could not be saved.\n\nError: $cropError"),
+             actions: [
+               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))
+             ],
+           )
+         );
+      } else {
+        widget.onFinished();
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text(_isEditing ? 'Field and crops updated' : 'Field and crops added')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _syncCrops(String plotId) async {
+    try {
+      if (!_isCultivated) {
+         // Logic to clear crops is handled by the toggle switch state change
+      }
+
+      // 1. Handle Deletions
+      for (String name in _deletedCropNames) {
+        String? err = await _fieldService.deleteCropFromBackend(plotId, name);
+        if (err != null) return "Delete $name failed: $err";
+      }
+
+      // 2. Handle Adds and Edits
+      for (var uiCrop in _uiCrops) {
+        if (uiCrop.isNew) {
+           String? err = await _fieldService.addCropToBackend(plotId, uiCrop.crop);
+           if (err != null) return "Add ${uiCrop.crop.name} failed: $err";
+        } else {
+           // It's an existing crop, check if we need to edit
+           // We always call edit for simplicity, or we could check dirty flags.
+           // Since we don't have dirty flags easily, let's call edit.
+           // Note: originalName must not be null here.
+           String? err = await _fieldService.editCropInBackend(plotId, uiCrop.originalName!, uiCrop.crop);
+           if (err != null) return "Update ${uiCrop.crop.name} failed: $err";
+        }
+      }
+      return null;
+    } catch (e) {
+      return e.toString();
     }
   }
 
   void _addCrop() {
     setState(() {
-      _crops.add(Crop(name: '', sowingDate: DateTime.now().toIso8601String(), harvestDate: DateTime.now().add(const Duration(days: 90)).toIso8601String()));
+      _uiCrops.add(_UiCrop(
+        crop: Crop(
+          name: '', // Initially empty, must submit via dropdown
+          plantingDate: DateTime.now(), 
+          harvestDate: DateTime.now().add(const Duration(days: 90))
+        ),
+        isNew: true
+      ));
     });
   }
 
   void _removeCrop(int index) {
     setState(() {
-      _crops.removeAt(index);
+      final removed = _uiCrops.removeAt(index);
+      if (!removed.isNew && removed.originalName != null) {
+        _deletedCropNames.add(removed.originalName!);
+      }
     });
   }
 
@@ -193,7 +301,13 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                       setState(() {
                          _isCultivated = value;
                          if (!_isCultivated) {
-                           _crops.clear(); // Clear crops if not cultivated
+                           // Remove all crops visually and mark for deletion
+                           for (var c in _uiCrops) {
+                             if (!c.isNew && c.originalName != null) {
+                               _deletedCropNames.add(c.originalName!);
+                             }
+                           }
+                           _uiCrops.clear(); 
                          }
                       });
                     },
@@ -214,14 +328,17 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                          ),
                       ],
                     ),
-                    if (_crops.isEmpty)
+                    if (_isLoadingCrops) 
+                      const Center(child: CircularProgressIndicator())
+                    else if (_uiCrops.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(8.0),
                         child: Text("No crops added."),
                       ),
-                    ..._crops.asMap().entries.map((entry) {
+                      
+                    ..._uiCrops.asMap().entries.map((entry) {
                       int index = entry.key;
-                      Crop crop = entry.value;
+                      _UiCrop uiCrop = entry.value;
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: Padding(
@@ -239,30 +356,72 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                                   ),
                                 ],
                               ),
-                              TextFormField(
-                                initialValue: crop.name,
-                                decoration: const InputDecoration(labelText: "Crop Name"),
-                                onChanged: (val) => crop.name = val,
-                                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Autocomplete<String>(
+                                    optionsBuilder: (TextEditingValue textEditingValue) {
+                                      if (textEditingValue.text.isEmpty) {
+                                        return const Iterable<String>.empty();
+                                      }
+                                      return _availableCrops.where((String option) {
+                                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                                      });
+                                    },
+                                    onSelected: (String selection) {
+                                      setState(() {
+                                        uiCrop.crop.name = selection;
+                                      });
+                                    },
+                                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                                      // Initialize controller if it's empty but model has value (e.g. edit mode)
+                                      if (textEditingController.text.isEmpty && uiCrop.crop.name.isNotEmpty) {
+                                        textEditingController.text = uiCrop.crop.name;
+                                      }
+                                      return TextFormField(
+                                        controller: textEditingController,
+                                        focusNode: focusNode,
+                                        decoration: const InputDecoration(labelText: "Crop Name (Type to search)"),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please select a crop';
+                                          }
+                                          if (!_availableCrops.contains(value)) {
+                                            return 'Select a valid crop from list';
+                                          }
+                                          // Duplicate check
+                                          int count = _uiCrops.where((c) => c.crop.name == value).length;
+                                          if (count > 1) {
+                                            return 'Duplicate crop';
+                                          }
+                                          return null;
+                                        },
+                                        onChanged: (val) {
+                                          uiCrop.crop.name = val;
+                                        },
+                                      );
+                                    },
+                                  );
+                                }
                               ),
+                              const SizedBox(height: 8),
                               Row(
                                 children: [
                                   Expanded(
                                     child: TextFormField(
                                       decoration: const InputDecoration(labelText: "Sowing Date"),
-                                      controller: TextEditingController(text: crop.sowingDate.split('T')[0]),
+                                      controller: TextEditingController(text: uiCrop.crop.plantingDate.toIso8601String().split('T')[0]),
                                       readOnly: true,
                                       onTap: () async {
                                          FocusScope.of(context).requestFocus(FocusNode());
                                          DateTime? picked = await showDatePicker(
                                           context: context,
-                                          initialDate: DateTime.tryParse(crop.sowingDate) ?? DateTime.now(),
+                                          initialDate: uiCrop.crop.plantingDate,
                                           firstDate: DateTime(2000),
                                           lastDate: DateTime(2030),
                                         );
                                         if(picked != null) {
                                           setState(() {
-                                            crop.sowingDate = picked.toIso8601String();
+                                            uiCrop.crop.plantingDate = picked;
                                           });
                                         }
                                       },
@@ -272,19 +431,19 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                                   Expanded(
                                     child: TextFormField(
                                       decoration: const InputDecoration(labelText: "Harvest Date"),
-                                      controller: TextEditingController(text: crop.harvestDate.split('T')[0]),
+                                      controller: TextEditingController(text: uiCrop.crop.harvestDate.toIso8601String().split('T')[0]),
                                       readOnly: true,
                                       onTap: () async {
                                          FocusScope.of(context).requestFocus(FocusNode());
                                          DateTime? picked = await showDatePicker(
                                           context: context,
-                                          initialDate: DateTime.tryParse(crop.harvestDate) ?? DateTime.now().add(const Duration(days: 90)),
+                                          initialDate: uiCrop.crop.harvestDate,
                                           firstDate: DateTime(2000),
                                           lastDate: DateTime(2030),
                                         );
                                         if(picked != null) {
                                           setState(() {
-                                            crop.harvestDate = picked.toIso8601String();
+                                            uiCrop.crop.harvestDate = picked;
                                           });
                                         }
                                       },
@@ -303,13 +462,19 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _saveField,
+                      onPressed: _isLoading ? null : _saveField,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: const Color(0xFF4CAF50),
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('SAVE FIELD',
+                      child: _isLoading 
+                          ? const SizedBox(
+                                height: 24, 
+                                width: 24, 
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                            )
+                          : const Text('SAVE FIELD',
                           style: TextStyle(fontSize: 18)),
                     ),
                   ),
