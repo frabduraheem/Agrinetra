@@ -3,17 +3,19 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../models/field_model.dart';
+import '../utils/polylabel.dart';
 
 class MapDrawingScreen extends StatefulWidget {
   final String title;
   final List<LatLng> initialPoints;
-  final List<List<LatLng>> existingPolygons;
+  final List<Field> existingFields; // Changed from List<List<LatLng>>
 
   const MapDrawingScreen({
     super.key,
     required this.title,
     this.initialPoints = const [],
-    this.existingPolygons = const [],
+    this.existingFields = const [], // Changed
   });
 
   @override
@@ -26,11 +28,21 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
   bool _hasChanges = false;
   bool _hasSelection = false;
   bool _isSatelliteView = false;
-  // Default camera position (e.g., a reasonable starting point)
-  static final LatLng _initialCenter = LatLng(
-    10.8505,
-    76.2711,
-  ); // Example: Kerala, India
+  static final LatLng _initialCenter = LatLng(10.8505, 76.2711); // Example: Kerala, India
+  final MapController _mapController = MapController();
+
+  // Helper to calculate centroid for labels
+  LatLng _getCentroid(List<LatLng> points) {
+    if (points.isEmpty) return const LatLng(0, 0);
+    double lat = 0;
+    double lng = 0;
+    for (var p in points) {
+      lat += p.latitude;
+      lng += p.longitude;
+    }
+    return LatLng(lat / points.length, lng / points.length);
+  }
+
   Future<void> _searchAddress(String query) async {
     final url = Uri.parse(
       'https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=1',
@@ -54,7 +66,6 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
     }
   }
 
-  final MapController _mapController = MapController();
   @override
   void initState() {
     super.initState();
@@ -292,13 +303,40 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
                 ],
                 // Existing Polygons Layer
                 PolygonLayer(
-                  polygons: widget.existingPolygons.map((points) => Polygon(
-                    points: points,
+                  polygons: widget.existingFields.map((field) => Polygon(
+                    points: field.boundary,
                     color: Colors.red.withOpacity(0.3), // Occupied area
                     borderColor: Colors.red,
                     borderStrokeWidth: 2,
                     isFilled: true,
                   )).toList(),
+                ),
+                // Labels for Existing Fields
+                MarkerLayer(
+                  markers: widget.existingFields.map((field) {
+                    // Use polylabel for better positioning
+                    LatLng labelPosition = field.boundary.isNotEmpty 
+                        ? getPolylabel(field.boundary) 
+                        : const LatLng(0, 0);
+
+                    return Marker(
+                      point: labelPosition,
+                      width: 100,
+                      height: 40,
+                      child: Center(
+                        child: Text(
+                          field.name,
+                          style: const TextStyle(
+                            color: Colors.white, 
+                            fontWeight: FontWeight.bold,
+                            shadows: [Shadow(offset: Offset(1,1), blurRadius: 2, color: Colors.black)],
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
                 // Polygon Layer
                 PolygonLayer(

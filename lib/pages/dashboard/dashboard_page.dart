@@ -4,6 +4,7 @@ import 'soil_health/soil_health_page.dart';
 import 'crop_health/crop_health_page.dart';
 import 'green_credits/green_credits_page.dart';
 import 'irrigation/irrigation_page.dart';
+import 'components/farm_map_widget.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -399,22 +400,9 @@ class _FarmMapCard extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: Color(0xFF5F7D5F)),
           ),
           const SizedBox(height: 20),
-          Container(
+          const SizedBox(
             height: 300,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F1E8),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Center(
-              child: Text(
-                'Map Placeholder',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Color(0xFF5F7D5F),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            child: FarmMapWidget(),
           ),
         ],
       ),

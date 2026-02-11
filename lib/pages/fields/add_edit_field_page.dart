@@ -78,7 +78,6 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
     // Get existing fields, excluding current one if editing
     final existingFields = _fieldService.getFields()
         .where((f) => _isEditing ? f.id != _fieldId : true)
-        .map((f) => f.boundary)
         .toList();
 
     final result = await Navigator.push(
@@ -87,7 +86,7 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
         builder: (context) => MapDrawingScreen(
           title: _isEditing ? "Edit Field Boundary" : "Draw Field Boundary",
           initialPoints: _boundary,
-          existingPolygons: existingFields,
+          existingFields: existingFields,
         ),
       ),
     );
