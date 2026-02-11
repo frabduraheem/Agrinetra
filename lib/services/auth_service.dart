@@ -38,6 +38,18 @@ class AuthService {
     await _auth.signOut();
   }
 
+  // Password Reset
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+  }
+
+  // Email Verification
+  Future<void> sendEmailVerification() async {
+    if (_auth.currentUser != null && !_auth.currentUser!.emailVerified) {
+      await _auth.currentUser!.sendEmailVerification();
+    }
+  }
+
   static String handleException(Object e) {
     if (e is FirebaseAuthException) {
       switch (e.code) {

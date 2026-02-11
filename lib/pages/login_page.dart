@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -30,12 +31,52 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
     try {
-      await _authService.signInWithEmail(
+      UserCredential? credential = await _authService.signInWithEmail(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
+
+      // Check Verification
+      if (credential != null && credential.user != null) {
+        if (!credential.user!.emailVerified) {
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Text('Email Not Verified'),
+                content: const Text('Please verify your email address to log in. Check your spam folder if you don\'t see it.'),
+                actions: [
+                  TextButton(
+                    onPressed: () async {
+                      await _authService.sendEmailVerification();
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Verification email resent!')),
+                        );
+                        await _authService.signOut();
+                      }
+                    },
+                    child: const Text('Resend Email'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                       await _authService.signOut();
+                       if (context.mounted) Navigator.pop(context);
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else {
+             // Verified
+             if (mounted) {
+                Navigator.pushReplacementNamed(context, '/dashboard');
+             }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -107,6 +148,15 @@ class _LoginPageState extends State<LoginPage> {
                         });
                       },
                     ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/forgot_password');
+                    },
+                    child: const Text("Forgot Password?"),
                   ),
                 ),
                 const SizedBox(height: 24),

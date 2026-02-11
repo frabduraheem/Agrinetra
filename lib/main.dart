@@ -6,6 +6,7 @@ import 'pages/welcome_page.dart';
 import 'pages/login_page.dart';
 import 'pages/register.dart';
 import 'pages/dashboard/dashboard_page.dart';
+import 'pages/forgot_password_page.dart';
 import 'services/auth_service.dart';
 
 void main() async {
@@ -34,6 +35,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/dashboard': (context) => const DashboardPage(),
         '/register': (context) => const RegistrationPage(),
+        '/forgot_password': (context) => const ForgotPasswordPage(),
       },
       home: StreamBuilder(
         stream: AuthService().authStateChanges,

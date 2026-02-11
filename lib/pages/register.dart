@@ -26,11 +26,27 @@ class _RegistrationPageState extends State<RegistrationPage> {
       setState(() => _isLoading = true);
       try {
         await _authService.registerWithEmail(_email!, _password!);
+        await _authService.sendEmailVerification();
+        await _authService.signOut(); // Verify before login
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registration Successful!')),
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Verification Email Sent'),
+              content: const Text('A verification email has been sent. Please check your inbox and verify your account before logging in.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
           );
-          Navigator.pushReplacementNamed(context, '/dashboard');
         }
       } catch (e) {
         if (mounted) {
