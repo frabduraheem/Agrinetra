@@ -286,17 +286,19 @@ class FieldService {
   }
 
   Future<List<String>> fetchAvailableCrops() async {
-    try {
-      final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/api/available_crops'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> crops = data['crops'];
-        return crops.map<String>((c) => c['name'] as String).toList();
-      }
-    } catch (e) {
-      print("Error fetching available crops: $e");
-    }
-    return [];
+    // Hardcoded as requested to avoid unnecessary networking for a static list
+    return [
+      "Rice",
+      "Wheat",
+      "Sugarcane",
+      "Cotton",
+      "Maize",
+      "Potato",
+      "Tomato",
+      "Onion",
+      "Soybean",
+      "Groundnut"
+    ];
   }
 
   Future<String?> addCropToBackend(String plotId, Crop crop) async {

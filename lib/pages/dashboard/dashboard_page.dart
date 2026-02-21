@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_layout.dart';
 import '../../models/field_model.dart';
 import '../../services/field_service.dart';
-import '../../services/analysis_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -16,7 +16,6 @@ class _DashboardPageState extends State<DashboardPage> with AutomaticKeepAliveCl
   bool get wantKeepAlive => true;
   bool _isLoading = true;
   List<Field> _fields = [];
-  Map<String, Map<String, dynamic>> _fieldAnalyses = {};
 
   @override
   void initState() {
@@ -28,18 +27,9 @@ class _DashboardPageState extends State<DashboardPage> with AutomaticKeepAliveCl
     await FieldService().loadFields();
     final loadedFields = FieldService().getFields();
     
-    Map<String, Map<String, dynamic>> analyses = {};
-    for (var f in loadedFields) {
-      final res = await AnalysisService().analyzeField(f);
-      if (res != null) {
-        analyses[f.id] = res;
-      }
-    }
-    
     if (mounted) {
       setState(() {
         _fields = loadedFields;
-        _fieldAnalyses = analyses;
         _isLoading = false;
       });
     }
@@ -89,11 +79,10 @@ class _DashboardPageState extends State<DashboardPage> with AutomaticKeepAliveCl
                     spacing: 16.0,
                     runSpacing: 16.0,
                     children: _fields.map((field) {
-                      final analysis = _fieldAnalyses[field.id];
                       return SizedBox(
                         width: 360, // Fixed width for each card so they tile nicely
                         height: 360, // Fixed height to prevent varied card heights when chip lines wrap
-                        child: _FieldInsightCard(field: field, analysis: analysis),
+                        child: _FieldInsightCard(field: field),
                       );
                     }).toList(),
                   ),
@@ -106,44 +95,58 @@ class _DashboardPageState extends State<DashboardPage> with AutomaticKeepAliveCl
 
 class _FieldInsightCard extends StatelessWidget {
   final Field field;
-  final Map<String, dynamic>? analysis;
 
-  const _FieldInsightCard({required this.field, this.analysis});
+  const _FieldInsightCard({required this.field});
 
   @override
   Widget build(BuildContext context) {
-    String currentCrop = "None";
-    if (field.crops != null && field.crops!.isNotEmpty) {
-      currentCrop = field.crops!.map((c) => c.name).join(', ');
-    }
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('plots').doc(field.id).snapshots(),
+      builder: (context, snapshot) {
+        Map<String, dynamic>? analysis;
+        if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>?;
+          if (data != null && data.containsKey('analysis')) {
+            analysis = data['analysis'] as Map<String, dynamic>?;
+          }
+        }
 
-    String moisture = "Loading/Unavailable";
-    String healthStatus = "N/A";
-    List<dynamic> fertRecs = [];
-    List<dynamic> cropRecs = [];
+        String currentCrop = "None";
+        if (field.crops != null && field.crops!.isNotEmpty) {
+          currentCrop = field.crops!.map((c) => c.name).join(', ');
+        }
 
-    if (analysis != null) {
-      if (analysis!['soil_health'] != null) {
-        moisture = "${analysis!['soil_health']['soil_moisture']}%";
-      }
-      if (analysis!['crop_analysis'] != null) {
-         healthStatus = analysis!['crop_analysis']['health_status'] ?? "N/A";
-         fertRecs = analysis!['crop_analysis']['fertilizer_recommendations'] ?? [];
-      }
-      cropRecs = analysis!['suggested_crops'] ?? [];
-    }
+        String moisture = "Pending Backend";
+        String healthStatus = "Pending Backend";
+        List<dynamic> fertRecs = [];
+        List<dynamic> cropRecs = [];
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7FAF7),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD4E7D4)),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        if (analysis != null) {
+          if (analysis['soil_moisture'] != null) {
+            moisture = "${analysis['soil_moisture']}%";
+          }
+          
+          if (analysis['crop_analysis'] != null && (analysis['crop_analysis'] as List).isNotEmpty) {
+             // For the dashboard overview, we just grab the first crop's analysis natively
+             final firstCrop = (analysis['crop_analysis'] as List).first;
+             healthStatus = firstCrop['healthStatus'] ?? "N/A";
+             fertRecs = firstCrop['fertilizerRecommendations'] ?? [];
+          }
+
+          cropRecs = analysis['suggested_crops'] ?? [];
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7FAF7),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFD4E7D4)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -221,9 +224,11 @@ class _FieldInsightCard extends StatelessWidget {
                  );
                }).toList(),
              )
-          ]
-        ),
-      ),
+              ]
+            ),
+          ),
+        );
+      },
     );
   }
 
