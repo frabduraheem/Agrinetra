@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_page.dart';
+import 'farm_map_page.dart';
 import 'soil_health/soil_health_page.dart';
 import 'crop_health/crop_health_page.dart';
 import 'green_credits/green_credits_page.dart';
@@ -98,6 +99,9 @@ class _DashboardLayoutState extends State<DashboardLayout> {
       case 'Fields':
         destination = const FieldManagementPage();
         break;
+      case 'Map':
+        destination = const FarmMapPage();
+        break;
       case 'Crop Health':
         destination = const CropHealthPage();
         break;
@@ -117,9 +121,13 @@ class _DashboardLayoutState extends State<DashboardLayout> {
         return;
     }
 
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => destination),
+      PageRouteBuilder(
+         pageBuilder: (context, animation1, animation2) => destination,
+         transitionDuration: Duration.zero,
+         reverseTransitionDuration: Duration.zero,
+      ),
     );
   }
 
@@ -186,6 +194,12 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                             Icons.grid_on,
                             'Fields',
                             widget.currentPage == 'Fields',
+                          ),
+                          _navItem(
+                            context,
+                            Icons.map,
+                            'Map',
+                            widget.currentPage == 'Map',
                           ),
                           _navItem(
                             context,

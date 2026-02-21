@@ -1,411 +1,242 @@
 import 'package:flutter/material.dart';
 import 'dashboard_layout.dart';
-import 'soil_health/soil_health_page.dart';
-import 'crop_health/crop_health_page.dart';
-import 'green_credits/green_credits_page.dart';
-import 'irrigation/irrigation_page.dart';
-import 'components/farm_map_widget.dart';
+import '../../models/field_model.dart';
+import '../../services/field_service.dart';
+import '../../services/analysis_service.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  bool _isLoading = true;
+  List<Field> _fields = [];
+  Map<String, Map<String, dynamic>> _fieldAnalyses = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await FieldService().loadFields();
+    final loadedFields = FieldService().getFields();
+    
+    Map<String, Map<String, dynamic>> analyses = {};
+    for (var f in loadedFields) {
+      final res = await AnalysisService().analyzeField(f);
+      if (res != null) {
+        analyses[f.id] = res;
+      }
+    }
+    
+    if (mounted) {
+      setState(() {
+        _fields = loadedFields;
+        _fieldAnalyses = analyses;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return DashboardLayout(
       currentPage: 'Dashboard',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Dashboard',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D5F2E),
+      child: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF2D5F2E)))
+        : SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Dashboard',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D5F2E),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Welcome back, here's your farm's overview.",
+                  style: TextStyle(fontSize: 16, color: Color(0xFF5F7D5F)),
+                ),
+                const SizedBox(height: 32),
+                
+                const SizedBox(height: 16),
+                const Text(
+                  'Field Insights & Recommendations',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D5F2E),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                if (_fields.isEmpty)
+                  const Text("No fields found. Add fields in the Field Management tab.")
+                else
+                  Wrap(
+                    spacing: 16.0,
+                    runSpacing: 16.0,
+                    children: _fields.map((field) {
+                      final analysis = _fieldAnalyses[field.id];
+                      return SizedBox(
+                        width: 360, // Fixed width for each card so they tile nicely
+                        height: 360, // Fixed height to prevent varied card heights when chip lines wrap
+                        child: _FieldInsightCard(field: field, analysis: analysis),
+                      );
+                    }).toList(),
+                  ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "Welcome back, here's your farm's overview.",
-            style: TextStyle(fontSize: 16, color: Color(0xFF5F7D5F)),
-          ),
-          const SizedBox(height: 32),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricCard(
-                  title: 'Irrigation Needs',
-                  icon: Icons.water_drop,
-                  value: 'Medium',
-                  subtitle: 'Next schedule in 2 days',
-                  linkText: 'View Irrigation Guide →',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const IrrigationPage()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _MetricCard(
-                  title: 'Crop Health',
-                  icon: Icons.local_florist,
-                  value: 'Good',
-                  subtitle: '85% of fields are healthy',
-                  linkText: 'View Health Map →',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CropHealthPage()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _MetricCard(
-                  title: 'Soil Moisture',
-                  icon: Icons.terrain,
-                  value: '55%',
-                  subtitle: 'Optimal range: 45-65%',
-                  linkText: 'View Soil Details →',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SoilHealthPage()),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 1,
-                child: _GreenCreditsCard(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const GreenCreditsPage(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(flex: 2, child: _PestAlertsCard()),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const _FarmMapCard(),
-        ],
-      ),
+        ),
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final String value;
-  final String subtitle;
-  final String linkText;
-  final VoidCallback onTap;
+class _FieldInsightCard extends StatelessWidget {
+  final Field field;
+  final Map<String, dynamic>? analysis;
 
-  const _MetricCard({
-    required this.title,
-    required this.icon,
-    required this.value,
-    required this.subtitle,
-    required this.linkText,
-    required this.onTap,
-  });
+  const _FieldInsightCard({required this.field, this.analysis});
 
   @override
   Widget build(BuildContext context) {
+    String currentCrop = "None";
+    if (field.crops != null && field.crops!.isNotEmpty) {
+      currentCrop = field.crops!.map((c) => c.name).join(', ');
+    }
+
+    String moisture = "Loading/Unavailable";
+    String healthStatus = "N/A";
+    List<dynamic> fertRecs = [];
+    List<dynamic> cropRecs = [];
+
+    if (analysis != null) {
+      if (analysis!['soil_health'] != null) {
+        moisture = "${analysis!['soil_health']['soil_moisture']}%";
+      }
+      if (analysis!['crop_analysis'] != null) {
+         healthStatus = analysis!['crop_analysis']['health_status'] ?? "N/A";
+         fertRecs = analysis!['crop_analysis']['fertilizer_recommendations'] ?? [];
+      }
+      cropRecs = analysis!['suggested_crops'] ?? [];
+    }
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFD4E7D4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        color: const Color(0xFFF7FAF7),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD4E7D4)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                title,
+                field.name,
                 style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF5F7D5F),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Icon(icon, color: const Color(0xFF5F7D5F), size: 20),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D5F2E),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF5F7D5F)),
-          ),
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: onTap,
-            child: Text(
-              linkText,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF2D8B3E),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GreenCreditsCard extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _GreenCreditsCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD4E7D4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'Green Credits',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF5F7D5F),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Icon(Icons.eco, color: Color(0xFF5F7D5F), size: 20),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '1,250',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D5F2E),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '+20 this month',
-            style: TextStyle(fontSize: 13, color: Color(0xFF5F7D5F)),
-          ),
-          const SizedBox(height: 16),
-          InkWell(
-            onTap: onTap,
-            child: const Text(
-              'View Eco Score →',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF2D8B3E),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PestAlertsCard extends StatelessWidget {
-  const _PestAlertsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD4E7D4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bug_report, color: Colors.red.shade700, size: 24),
-              const SizedBox(width: 8),
-              const Text(
-                'Pest Alerts',
-                style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF2D5F2E),
                 ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4E7D4),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  "Crop: $currentCrop",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2D5F2E),
+                  ),
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Potential threats detected in your fields.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF5F7D5F)),
-          ),
-          const SizedBox(height: 20),
-          const _PestAlertItem(
-            name: 'Aphids',
-            field: 'Field 3 - Moderate risk',
-            severity: 'High',
-            severityColor: Colors.red,
           ),
           const SizedBox(height: 12),
-          const _PestAlertItem(
-            name: 'Spider Mites',
-            field: 'Field 1 - Low risk',
-            severity: 'Low',
-            severityColor: Colors.grey,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PestAlertItem extends StatelessWidget {
-  final String name;
-  final String field;
-  final String severity;
-  final Color severityColor;
-
-  const _PestAlertItem({
-    required this.name,
-    required this.field,
-    required this.severity,
-    required this.severityColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2D5F2E),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                field,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF5F7D5F)),
-              ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: severityColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              severity,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: severityColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FarmMapCard extends StatelessWidget {
-  const _FarmMapCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          
+          // Metrics
           Row(
-            children: const [
-              Icon(Icons.location_on, color: Color(0xFF2D5F2E), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'My Farm',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D5F2E),
-                ),
-              ),
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildMiniMetric(Icons.water_drop, "Moisture", moisture),
+              _buildMiniMetric(Icons.health_and_safety, "Health", healthStatus),
             ],
           ),
-          const SizedBox(height: 8),
+          
+          const Divider(height: 20, color: Color(0xFFD4E7D4)),
+
+          // Recommendations
           const Text(
-            'An overview of your registered land.',
-            style: TextStyle(fontSize: 14, color: Color(0xFF5F7D5F)),
+            "Fertilizer Recommendations",
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2D5F2E)),
           ),
-          const SizedBox(height: 20),
-          const SizedBox(
-            height: 300,
-            child: FarmMapWidget(),
+          const SizedBox(height: 4),
+          if (fertRecs.isEmpty) 
+             const Text("- No specific fertilizer recommendations", style: TextStyle(fontSize: 12, color: Colors.black54))
+          else
+             ...fertRecs.map((e) => Text("- $e", style: const TextStyle(fontSize: 12, color: Colors.black87))).toList(),
+             
+          const SizedBox(height: 12),
+          
+          const Text(
+            "Suggested Alternative Crops",
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2D5F2E)),
           ),
-        ],
+          const SizedBox(height: 4),
+          if (cropRecs.isEmpty) 
+             const Text("- No specific alternatives suggested", style: TextStyle(fontSize: 12, color: Colors.black54))
+          else
+             Wrap(
+               spacing: 6,
+               runSpacing: 6,
+               children: cropRecs.map((e) {
+                 final String cropName = e is Map ? (e['crop'] ?? e.toString()) : e.toString();
+                 return Chip(
+                   label: Text(cropName, style: const TextStyle(fontSize: 11)),
+                   padding: EdgeInsets.zero,
+                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                   backgroundColor: const Color(0xFFE8F5E9),
+                   side: const BorderSide(color: Color(0xFFC8E6C9)),
+                 );
+               }).toList(),
+             )
+          ]
+        ),
       ),
     );
   }
+
+  Widget _buildMiniMetric(IconData icon, String label, String value) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF5F7D5F)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF5F7D5F))),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF2D5F2E))),
+      ],
+    );
+  }
 }
+

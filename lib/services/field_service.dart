@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turf/turf.dart' as turf;
 import 'package:latlong2/latlong.dart';
 import '../models/field_model.dart';
 import 'package:turf/helpers.dart';
 import 'package:clipper2/clipper2.dart';
+import '../config/api_config.dart';
 
 class FieldService {
   static final FieldService _instance = FieldService._internal();
@@ -218,70 +220,74 @@ class FieldService {
     if (user == null) return "User not logged in";
 
     try {
-        final response = await http.post(
-          Uri.parse('http://127.0.0.1:5000/api/add_plot'),
-          headers: {"Content-Type": "application/json"},
-          body: json.encode({
-            "plotid": field.id,
-            "userid": user.uid,
-            "plotname": field.name,
-            "boundaries": field.boundary.map((p) => {"lat": p.latitude, "lng": p.longitude}).toList(),
-          }),
-        );
+        final plotData = {
+          "pid": field.id,
+          "uid": user.uid,
+          "plotname": field.name,
+          "boundaries": field.boundary.map((p) => {"lat": p.latitude, "lng": p.longitude}).toList(),
+        };
 
-        if (response.statusCode == 200) {
-          return null;
-        } else {
-          return "Failed to add plot: ${response.statusCode}";
-        }
+        await FirebaseFirestore.instance
+            .collection('plots')
+            .doc(field.id)
+            .set(plotData);
+
+        return null;
     } catch (e) {
-      return "Network Error: $e";
+      return "Firestore Error: $e";
     }
   }
 
   Future<String?> updateFieldInBackend(Field field) async {
-    try {
-      final response = await http.put(
-        Uri.parse('http://127.0.0.1:5000/api/edit_plot'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({
-          "plotid": field.id,
-          "plotname": field.name,
-          "boundaries": field.boundary.map((p) => {"lat": p.latitude, "lng": p.longitude}).toList(),
-        }),
-      );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return "User not logged in";
 
-      if (response.statusCode == 200) {
-        return null;
-      } else {
-        return "Failed to update plot: ${response.statusCode}";
-      }
+    try {
+      final docRef = FirebaseFirestore.instance.collection('plots').doc(field.id);
+      final docSnap = await docRef.get();
+      
+      if (!docSnap.exists) return "Plot not found in database";
+      if (docSnap.data()!['uid'] != user.uid) return "Unauthorized to edit this plot";
+
+      await docRef.update({
+        "plotname": field.name,
+        "boundaries": field.boundary.map((p) => {"lat": p.latitude, "lng": p.longitude}).toList(),
+      });
+
+      return null;
     } catch (e) {
-      return "Network Error: $e";
+      return "Firestore Error: $e";
     }
   }
 
   Future<String?> deleteFieldFromBackend(String plotId) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('http://127.0.0.1:5000/api/delete_plot'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({"plotid": plotId}),
-      );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return "User not logged in";
 
-      if (response.statusCode == 200) {
-        return null;
-      } else {
-        return "Failed to delete plot: ${response.statusCode}";
+    try {
+      final docRef = FirebaseFirestore.instance.collection('plots').doc(plotId);
+      final docSnap = await docRef.get();
+      
+      if (!docSnap.exists) return "Plot already deleted";
+      if (docSnap.data()!['uid'] != user.uid) return "Unauthorized to delete this plot";
+
+      // Note: Firestore doesn't automatically cascade delete subcollections. 
+      // We must manually delete the crops subcollection fields first.
+      final cropsSnap = await docRef.collection('crops').get();
+      for (var crop in cropsSnap.docs) {
+         await crop.reference.delete();
       }
+
+      await docRef.delete();
+      return null;
     } catch (e) {
-      return "Network Error: $e";
+      return "Firestore Error: $e";
     }
   }
 
   Future<List<String>> fetchAvailableCrops() async {
     try {
-      final response = await http.get(Uri.parse('http://127.0.0.1:5000/api/available_crops'));
+      final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/api/available_crops'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> crops = data['crops'];
@@ -294,90 +300,114 @@ class FieldService {
   }
 
   Future<String?> addCropToBackend(String plotId, Crop crop) async {
-    try {
-      final response = await http.post(
-        Uri.parse('http://127.0.0.1:5000/api/add_crop'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({
-          "plotid": plotId,
-          "cropname": crop.name,
-          "plantingdate": crop.plantingDate.toIso8601String().split('T')[0],
-          "harvestdate": crop.harvestDate.toIso8601String().split('T')[0],
-        }),
-      );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return "User not logged in";
 
-      if (response.statusCode == 200) {
-        return null; // Success
-      } else {
-        return "Failed to add crop: ${response.body}";
-      }
+    try {
+      final plotRef = FirebaseFirestore.instance.collection('plots').doc(plotId);
+      final plotSnap = await plotRef.get();
+      
+      if (!plotSnap.exists) return "Parent plot does not exist";
+      if (plotSnap.data()!['uid'] != user.uid) return "Unauthorized to add crop to this plot";
+
+      await plotRef.collection('crops').add({
+        "pid": plotId,
+        "cropname": crop.name,
+        "plantingdate": crop.plantingDate.toIso8601String().split('T')[0],
+        "harvestdate": crop.harvestDate.toIso8601String().split('T')[0],
+      });
+
+      return null;
     } catch (e) {
-      return "Network Error: $e";
+      return "Firestore Error: $e";
     }
   }
 
   Future<String?> editCropInBackend(String plotId, String oldCropName, Crop updatedCrop) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return "User not logged in";
+
     try {
-      final response = await http.put(
-        Uri.parse('http://127.0.0.1:5000/api/edit_crop'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({
-          "plotid": plotId,
-          "old_cropname": oldCropName,
-          "new_cropname": updatedCrop.name,
+      final plotRef = FirebaseFirestore.instance.collection('plots').doc(plotId);
+      final plotSnap = await plotRef.get();
+      
+      if (!plotSnap.exists) return "Parent plot does not exist";
+      if (plotSnap.data()!['uid'] != user.uid) return "Unauthorized to edit crops in this plot";
+
+      // Find the specific crop by old name
+      final cropsSnap = await plotRef.collection('crops')
+          .where('cropname', isEqualTo: oldCropName)
+          .get();
+
+      if (cropsSnap.docs.isNotEmpty) {
+        // Technically there should only be one active crop matching the string name, update the first match
+        await cropsSnap.docs.first.reference.update({
+          "cropname": updatedCrop.name,
           "plantingdate": updatedCrop.plantingDate.toIso8601String().split('T')[0],
           "harvestdate": updatedCrop.harvestDate.toIso8601String().split('T')[0],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return null; // Success
+        });
+        return null;
       } else {
-        return "Failed to update crop: ${response.body}";
+        return "Crop not found";
       }
     } catch (e) {
-      return "Network Error: $e";
+      return "Firestore Error: $e";
     }
   }
 
   Future<String?> deleteCropFromBackend(String plotId, String cropName) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('http://127.0.0.1:5000/api/delete_crop'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({
-          "plotid": plotId,
-          "cropname": cropName,
-        }),
-      );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return "User not logged in";
 
-      if (response.statusCode == 200) {
-        return null; // Success
+    try {
+      final plotRef = FirebaseFirestore.instance.collection('plots').doc(plotId);
+      final plotSnap = await plotRef.get();
+      
+      if (!plotSnap.exists) return "Parent plot does not exist";
+      if (plotSnap.data()!['uid'] != user.uid) return "Unauthorized to delete crops from this plot";
+
+      // Find the specific crop by name and delete it
+      final cropsSnap = await plotRef.collection('crops')
+          .where('cropname', isEqualTo: cropName)
+          .get();
+
+      if (cropsSnap.docs.isNotEmpty) {
+        await cropsSnap.docs.first.reference.delete();
+        return null;
       } else {
-        return "Failed to delete crop: ${response.body}";
+        return "Crop not found";
       }
     } catch (e) {
-      return "Network Error: $e";
+      return "Firestore Error: $e";
     }
   }
 
   Future<List<Crop>> fetchCropsForField(String plotId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://127.0.0.1:5000/api/fetch_crops?plotid=$plotId'),
-      );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> cropsData = data['crops'];
-        return cropsData.map((c) => Crop(
+    try {
+      // Add a security check: ensures user is only fetching crops for plots they actually own
+      final plotRef = FirebaseFirestore.instance.collection('plots').doc(plotId);
+      final plotSnap = await plotRef.get();
+      
+      if (!plotSnap.exists || plotSnap.data()!['uid'] != user.uid) {
+         return [];
+      }
+
+      final cropsSnap = await plotRef.collection('crops').get();
+
+      return cropsSnap.docs.map((doc) {
+        final c = doc.data();
+        return Crop(
           name: c['cropname'],
           plantingDate: DateTime.parse(c['plantingdate']),
           harvestDate: DateTime.parse(c['harvestdate']),
-        )).toList();
-      }
+        );
+      }).toList();
+      
     } catch (e) {
-      print("Error fetching crops for plot $plotId: $e");
+      print("Firestore Error fetching crops for plot $plotId: $e");
     }
     return [];
   }
@@ -387,53 +417,49 @@ class FieldService {
     if (user == null) return false;
 
     try {
-      final response = await http.get(
-        Uri.parse('http://127.0.0.1:5000/api/fetch_plots?userid=${user.uid}'),
-      );
+      final userPlotsSnap = await FirebaseFirestore.instance
+          .collection('plots')
+          .where('uid', isEqualTo: user.uid)
+          .get();
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> plots = data['plots'];
-        
-        List<Field> remoteFields = [];
-        for (var p in plots) {
-           List<LatLng> boundary = [];
-           if (p['boundaries'] != null) {
-              var bounds = p['boundaries'];
-              if (bounds is String) {
-                 try {
-                    bounds = json.decode(bounds);
-                 } catch (e) {
-                    print("Error decoding boundary string: $e");
-                 }
-              }
-              if (bounds is List) {
-                 boundary = bounds.map<LatLng>((b) => LatLng(b['lat'], b['lng'])).toList();
-              }
-           }
-           
-           String pid = p['pid'];
-           List<Crop> crops = await fetchCropsForField(pid);
+      List<Field> remoteFields = [];
+      
+      for (var doc in userPlotsSnap.docs) {
+         final p = doc.data();
+         List<LatLng> boundary = [];
+         
+         if (p['boundaries'] != null) {
+            var bounds = p['boundaries'];
+            if (bounds is String) {
+               try {
+                  bounds = json.decode(bounds);
+               } catch (e) {
+                  print("Error decoding boundary string: $e");
+               }
+            }
+            if (bounds is List) {
+               boundary = bounds.map<LatLng>((b) => LatLng(b['lat'], b['lng'])).toList();
+            }
+         }
+         
+         String pid = p['pid'] ?? doc.id;
+         List<Crop> crops = await fetchCropsForField(pid);
 
-           remoteFields.add(Field(
-             id: pid,
-             name: p['plotname'],
-             boundary: boundary, 
-             crops: crops, 
-             isCultivated: crops.isNotEmpty
-           ));
-        }
-        
-        _fields = remoteFields;
-        await saveFields();
-        return true;
-        
-      } else {
-        print("Failed to fetch plots: ${response.statusCode} ${response.body}");
-        return false;
+         remoteFields.add(Field(
+           id: pid,
+           name: p['plotname'] ?? 'Unknown Field',
+           boundary: boundary, 
+           crops: crops, 
+           isCultivated: crops.isNotEmpty
+         ));
       }
+      
+      _fields = remoteFields;
+      await saveFields();
+      return true;
+      
     } catch (e) {
-      print("Error fetching fields: $e");
+      print("Firestore Error fetching fields: $e");
       return false;
     }
   }
