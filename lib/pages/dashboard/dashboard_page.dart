@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_layout.dart';
+import 'components/field_details_page.dart';
 import '../../models/field_model.dart';
 import '../../services/field_service.dart';
 
@@ -116,24 +117,62 @@ class _FieldInsightCard extends StatelessWidget {
           currentCrop = field.crops!.map((c) => c.name).join(', ');
         }
 
+        String targetCrop = "Analyzing...";
+    if (analysis != null) {
+      if (analysis['crop_viability_analysis'] != null && analysis['crop_viability_analysis'].isNotEmpty) {
+        targetCrop = analysis['crop_viability_analysis'][0]['crop'] ?? "Unknown";
+      } else {
+         targetCrop = "Pending Setup";
+      }
+    }
         String moisture = "Pending Backend";
         String healthStatus = "Pending Backend";
         List<dynamic> fertRecs = [];
         List<dynamic> cropRecs = [];
+        String? systemMessage;
+
+        // Make v2Report accessible to the build method
+        Map<String, dynamic>? currentV2Report;
 
         if (analysis != null) {
-          if (analysis['soil_moisture'] != null) {
-            moisture = "${analysis['soil_moisture']}%";
-          }
+          // V2 Structure Parsing
+          final v2Report = analysis['v2_engine_report'] as Map<String, dynamic>?;
+          currentV2Report = v2Report;
           
-          if (analysis['crop_analysis'] != null && (analysis['crop_analysis'] as List).isNotEmpty) {
-             // For the dashboard overview, we just grab the first crop's analysis natively
-             final firstCrop = (analysis['crop_analysis'] as List).first;
-             healthStatus = firstCrop['healthStatus'] ?? "N/A";
-             fertRecs = firstCrop['fertilizerRecommendations'] ?? [];
+          if (v2Report != null) {
+               final envData = v2Report['environmental_data'] as Map<String, dynamic>?;
+               if (envData != null && envData.containsKey('soil')) {
+                  final soil = envData['soil'] as Map<String, dynamic>;
+                  if (soil.containsKey('soil_moisture')) {
+                      moisture = "${soil['soil_moisture']}%";
+                  }
+               } else if (v2Report.containsKey('system_message') && v2Report['system_message'].toString().contains('Non-arable')) {
+                  moisture = "N/A";
+               }
+    
+              // 2. Focused Analysis (Fertilizer, Irrigation Health)
+              final focusedAnalysis = v2Report['focused_analysis'] as Map<String, dynamic>?;
+              if (focusedAnalysis != null) {
+                  fertRecs = focusedAnalysis['fertilizer_recommendations'] ?? [];
+                  
+                  final irrigation = focusedAnalysis['irrigation'];
+                  if (irrigation != null && irrigation is Map) {
+                      healthStatus = irrigation['status']?.toString() ?? "Analyzed";
+                  } else {
+                      healthStatus = "Analyzed";
+                  }
+              } else if (v2Report.containsKey('system_message') && v2Report['system_message'].toString().contains('Non-arable')) {
+                  healthStatus = "Non-Arable Land";
+              }
+              
+              // 3. Top Crops
+              final topCrops = v2Report['top_crops'] as List<dynamic>?;
+              if (topCrops != null && topCrops.isNotEmpty) {
+                  cropRecs = topCrops;
+              }
+              
+              systemMessage = v2Report['system_message'] as String?;
           }
-
-          cropRecs = analysis['suggested_crops'] ?? [];
         }
 
         return Container(
@@ -189,41 +228,44 @@ class _FieldInsightCard extends StatelessWidget {
           
           const Divider(height: 20, color: Color(0xFFD4E7D4)),
 
-          // Recommendations
-          const Text(
-            "Fertilizer Recommendations",
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2D5F2E)),
-          ),
-          const SizedBox(height: 4),
-          if (fertRecs.isEmpty) 
-             const Text("- No specific fertilizer recommendations", style: TextStyle(fontSize: 12, color: Colors.black54))
-          else
-             ...fertRecs.map((e) => Text("- $e", style: const TextStyle(fontSize: 12, color: Colors.black87))).toList(),
-             
-          const SizedBox(height: 12),
-          
-          const Text(
-            "Suggested Alternative Crops",
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2D5F2E)),
-          ),
-          const SizedBox(height: 4),
-          if (cropRecs.isEmpty) 
-             const Text("- No specific alternatives suggested", style: TextStyle(fontSize: 12, color: Colors.black54))
-          else
-             Wrap(
-               spacing: 6,
-               runSpacing: 6,
-               children: cropRecs.map((e) {
-                 final String cropName = e is Map ? (e['crop'] ?? e.toString()) : e.toString();
-                 return Chip(
-                   label: Text(cropName, style: const TextStyle(fontSize: 11)),
-                   padding: EdgeInsets.zero,
-                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                   backgroundColor: const Color(0xFFE8F5E9),
-                   side: const BorderSide(color: Color(0xFFC8E6C9)),
-                 );
-               }).toList(),
+          // Recommendations Notice
+          if (systemMessage != null && systemMessage!.contains("Non-arable"))
+             Text("Engine Alert: $systemMessage", style: const TextStyle(fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic))
+          else if (currentV2Report == null)
+             const Text("Awaiting Engine V2 Analysis completion...", style: TextStyle(fontSize: 13, color: Colors.black54, fontStyle: FontStyle.italic))
+          else ...[
+             const Text(
+               "Advanced Analysis Available",
+               style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2D5F2E)),
+             ),
+             const SizedBox(height: 8),
+             const Text(
+               "Includes timeline, fertilizer schedules, secondary crop viability, and future seasonal outlook.",
+               style: TextStyle(fontSize: 11, color: Colors.black54),
+             ),
+             const SizedBox(height: 16),
+             SizedBox(
+               width: double.infinity,
+               child: ElevatedButton(
+                 onPressed: () {
+                   Navigator.push(
+                     context,
+                     MaterialPageRoute(
+                       builder: (context) => FieldDetailsPage(field: field, v2Report: currentV2Report!),
+                     ),
+                   );
+                 },
+                 style: ElevatedButton.styleFrom(
+                   backgroundColor: const Color(0xFF2D5F2E),
+                   foregroundColor: Colors.white,
+                   padding: const EdgeInsets.symmetric(vertical: 12),
+                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                   elevation: 0,
+                 ),
+                 child: const Text("View Detailed Analysis", style: TextStyle(fontWeight: FontWeight.bold)),
+               ),
              )
+          ]
               ]
             ),
           ),

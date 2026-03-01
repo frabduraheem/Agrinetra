@@ -99,7 +99,7 @@ class _FarmMapWidgetState extends State<FarmMapWidget> {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.app',
+              userAgentPackageName: 'com.example.agrinetra',
             ),
             PolygonLayer(
               polygons: _fields.map((field) => Polygon(

@@ -286,18 +286,111 @@ class FieldService {
   }
 
   Future<List<String>> fetchAvailableCrops() async {
-    // Hardcoded as requested to avoid unnecessary networking for a static list
+    // Hardcoded to match Engine V2 CROP_DB to avoid unnecessary networking for a static list
     return [
       "Rice",
       "Wheat",
-      "Sugarcane",
-      "Cotton",
       "Maize",
-      "Potato",
+      "Cotton",
+      "Sugarcane",
+      "Blackgram",
+      "Chickpea",
+      "Coconut",
       "Tomato",
-      "Onion",
+      "Potato",
       "Soybean",
-      "Groundnut"
+      "Sorghum",
+      "Pearl Millet",
+      "Groundnut",
+      "Sunflower",
+      "Onion",
+      "Garlic",
+      "Carrot",
+      "Cabbage",
+      "Banana",
+      "Mango",
+      "Ginger",
+      "Turmeric",
+      "Cumin",
+      "Coriander",
+      "Chilli",
+      "Papaya",
+      "Watermelon",
+      "Citrus",
+      "Cucumber",
+      "Eggplant",
+      "Spinach",
+      "Okra",
+      "Tea",
+      "Coffee",
+      "Rubber",
+      "Pineapple",
+      "Barley",
+      "Oats",
+      "Rye",
+      "Quinoa",
+      "Buckwheat",
+      "Amaranth",
+      "Cowpea",
+      "Pigeonpea",
+      "Lentil",
+      "Mungbean",
+      "Peas",
+      "Sweet Potato",
+      "Cassava",
+      "Yam",
+      "Taro",
+      "Radish",
+      "Turnip",
+      "Beetroot",
+      "Cauliflower",
+      "Broccoli",
+      "Kale",
+      "Lettuce",
+      "Celery",
+      "Asparagus",
+      "Zucchini",
+      "Pumpkin",
+      "Bitter Gourd",
+      "Bottle Gourd",
+      "Ridge Gourd",
+      "Ash Gourd",
+      "Apple",
+      "Pear",
+      "Peach",
+      "Plum",
+      "Cherry",
+      "Grape",
+      "Strawberry",
+      "Blueberry",
+      "Raspberry",
+      "Blackberry",
+      "Pomegranate",
+      "Guava",
+      "Avocado",
+      "Almond",
+      "Walnut",
+      "Pecan",
+      "Cashew",
+      "Pistachio",
+      "Macadamia",
+      "Hazelnut",
+      "Mustard",
+      "Safflower",
+      "Sesame",
+      "Linseed",
+      "Castor",
+      "Cacao",
+      "Vanilla",
+      "Black Pepper",
+      "Cardamom",
+      "Clove",
+      "Cinnamon",
+      "Tobacco",
+      "Jute",
+      "Hemp",
+      "Teff",
+      "Lima Bean"
     ];
   }
 
@@ -315,8 +408,8 @@ class FieldService {
       await plotRef.collection('crops').add({
         "pid": plotId,
         "cropname": crop.name,
-        "plantingdate": crop.plantingDate.toIso8601String().split('T')[0],
-        "harvestdate": crop.harvestDate.toIso8601String().split('T')[0],
+        "plantingdate_start": crop.plantingDateStart.toIso8601String().split('T')[0],
+        "plantingdate_end": crop.plantingDateEnd.toIso8601String().split('T')[0],
       });
 
       return null;
@@ -345,8 +438,8 @@ class FieldService {
         // Technically there should only be one active crop matching the string name, update the first match
         await cropsSnap.docs.first.reference.update({
           "cropname": updatedCrop.name,
-          "plantingdate": updatedCrop.plantingDate.toIso8601String().split('T')[0],
-          "harvestdate": updatedCrop.harvestDate.toIso8601String().split('T')[0],
+          "plantingdate_start": updatedCrop.plantingDateStart.toIso8601String().split('T')[0],
+          "plantingdate_end": updatedCrop.plantingDateEnd.toIso8601String().split('T')[0],
         });
         return null;
       } else {
@@ -400,11 +493,19 @@ class FieldService {
       final cropsSnap = await plotRef.collection('crops').get();
 
       return cropsSnap.docs.map((doc) {
-        final c = doc.data();
+        final c = doc.data() as Map<String, dynamic>;
+        
+        DateTime pStart = c.containsKey('plantingdate_start') 
+            ? DateTime.parse(c['plantingdate_start']) 
+            : DateTime.parse(c['plantingdate']);
+        DateTime pEnd = c.containsKey('plantingdate_end') 
+            ? DateTime.parse(c['plantingdate_end']) 
+            : DateTime.parse(c['plantingdate']);
+            
         return Crop(
           name: c['cropname'],
-          plantingDate: DateTime.parse(c['plantingdate']),
-          harvestDate: DateTime.parse(c['harvestdate']),
+          plantingDateStart: pStart,
+          plantingDateEnd: pEnd,
         );
       }).toList();
       

@@ -30,10 +30,13 @@ class _DashboardLayoutState extends State<DashboardLayout> {
   final TextEditingController _searchController = TextEditingController();
   bool _showSearchResults = false;
   List<Map<String, dynamic>> _searchResults = [];
-
+  bool _isSidebarVisible = false;
   final List<Map<String, dynamic>> _allFeatures = [
     {'name': 'Dashboard', 'icon': Icons.dashboard, 'page': 'Dashboard'},
     {'name': 'Fields', 'icon': Icons.grid_on, 'page': 'Fields'}, // Added Fields
+    {'name': 'Settings', 'icon': Icons.settings, 'page': 'Settings'},
+    {'name': 'Account', 'icon': Icons.account_circle, 'page': 'Settings'},
+    /* Unimplemented features hidden
     {'name': 'Crop Health', 'icon': Icons.local_florist, 'page': 'Crop Health'},
     {'name': 'NDVI Map', 'icon': Icons.map, 'page': 'Crop Health'},
     {'name': 'Irrigation', 'icon': Icons.water_drop, 'page': 'Irrigation'},
@@ -48,6 +51,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     {'name': 'Badges', 'icon': Icons.emoji_events, 'page': 'Green Credits'},
     {'name': 'Settings', 'icon': Icons.settings, 'page': 'Settings'},
     {'name': 'Account', 'icon': Icons.account_circle, 'page': 'Settings'},
+    */
   ];
 
   void _performSearch(String query) {
@@ -84,6 +88,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
     setState(() {
       _showSearchResults = false;
       _searchController.clear();
+      _isSidebarVisible = false;
     });
 
     // Don't navigate if we're already on this page
@@ -143,10 +148,100 @@ class _DashboardLayoutState extends State<DashboardLayout> {
       backgroundColor: const Color(0xFFE8F1E8),
       body: Stack(
         children: [
-          Row(
+          // Main Content Layer (Always takes full width)
+          Column(
             children: [
-              // Sidebar
+              // Top App Bar
               Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.white,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.menu, color: Color(0xFF2D5F2E)),
+                      onPressed: () {
+                        setState(() {
+                          _isSidebarVisible = !_isSidebarVisible;
+                        });
+                      },
+                      tooltip: 'Toggle Sidebar',
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            hintText: 'Search features...',
+                            border: InputBorder.none,
+                            icon: Icon(Icons.search, color: Colors.grey),
+                          ),
+                          onChanged: _performSearch,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: const Color(0xFF4CAF50),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: () => _navigateToPage(context, 'Settings'),
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Account Settings',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Page Content
+              Expanded(
+                child: widget.enableScrolling
+                    ? SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: widget.child,
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: widget.child,
+                      ),
+              ),
+            ],
+          ),
+          
+          // Dim Overlay when Sidebar is visible
+          if (_isSidebarVisible)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isSidebarVisible = false;
+                  });
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.3),
+                ),
+              ),
+            ),
+            
+          // Sidebar Layer
+          if (_isSidebarVisible)
+            Positioned(
+              top: 0,
+              bottom: 0,
+              left: 0,
+              child: Container(
                 width: 256,
                 color: const Color(0xFFD4E7D4),
                 child: Column(
@@ -201,6 +296,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                             'Map',
                             widget.currentPage == 'Map',
                           ),
+                          /* Unimplemented tabs hidden
                           _navItem(
                             context,
                             Icons.local_florist,
@@ -225,6 +321,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                             'Green Credits',
                             widget.currentPage == 'Green Credits',
                           ),
+                          */
                         ],
                       ),
                     ),
@@ -239,6 +336,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                             'Settings',
                             widget.currentPage == 'Settings',
                           ),
+                          /*
                           ListTile(
                             leading: const Icon(
                               Icons.support,
@@ -256,82 +354,20 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                               );
                             },
                           ),
+                          */
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              // Main Content
-              Expanded(
-                child: Column(
-                  children: [
-                    // Top App Bar
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      color: Colors.white,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF5F5F5),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Search features...',
-                                  border: InputBorder.none,
-                                  icon: Icon(Icons.search, color: Colors.grey),
-                                ),
-                                onChanged: _performSearch,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: const Color(0xFF4CAF50),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.person,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              onPressed: () => _logout(context),
-                              padding: EdgeInsets.zero,
-                              tooltip: 'Logout',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Page Content
-                    Expanded(
-                      child: widget.enableScrolling
-                          ? SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
-                              child: widget.child,
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: widget.child,
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+            
           // Search Results Overlay
           if (_showSearchResults)
             Positioned(
               top: 72,
-              left: 256 + 16,
+              left: 80,
               right: 16,
               child: Container(
                 constraints: const BoxConstraints(maxHeight: 400),

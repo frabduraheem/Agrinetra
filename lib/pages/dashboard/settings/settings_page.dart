@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../dashboard_layout.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -9,34 +11,18 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // Farmer Account Info
-  final TextEditingController farmerNameController = TextEditingController(
-    text: "Rajesh Kumar",
-  );
-  final TextEditingController phoneController = TextEditingController(
-    text: "+91 98765 43210",
-  );
-  final TextEditingController emailController = TextEditingController(
-    text: "rajesh.farmer@example.com",
-  );
-  final TextEditingController farmNameController = TextEditingController(
-    text: "Green Valley Farm",
-  );
-  final TextEditingController farmLocationController = TextEditingController(
-    text: "Kochi, Kerala, India",
-  );
-  final TextEditingController farmSizeController = TextEditingController(
-    text: "5.2 hectares",
-  );
-  final TextEditingController cropsController = TextEditingController(
-    text: "Rice, Coconut, Vegetables",
-  );
-
-  // Preferences
   String language = "en";
-  bool pushNotifications = true;
-  bool weatherAlerts = true;
-  bool pestAlerts = true;
+  bool isDarkMode = false;
+  
+  String get currentEmail => FirebaseAuth.instance.currentUser?.email ?? "Not logged in";
+
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+    if (context.mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +32,7 @@ class _SettingsPageState extends State<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Account & Settings",
+            "Settings",
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -55,223 +41,57 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "Manage your farm account and preferences.",
+            "Manage your account, preferences, and app settings.",
             style: TextStyle(fontSize: 16, color: Color(0xFF5F7D5F)),
           ),
           const SizedBox(height: 32),
+          
           LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth >= 900) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(flex: 2, child: _accountInfoCard()),
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        children: [
+                          _buildAccountSection(),
+                        ],
+                      ),
+                    ),
                     const SizedBox(width: 16),
-                    Expanded(flex: 1, child: _preferencesCard()),
+                    Expanded(
+                      flex: 1,
+                      child: Container(), // Empty space for wide screens
+                    ),
                   ],
                 );
               } else {
                 return Column(
                   children: [
-                    _accountInfoCard(),
-                    const SizedBox(height: 16),
-                    _preferencesCard(),
+                    _buildAccountSection(),
                   ],
                 );
               }
             },
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _accountInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.account_circle, color: Color(0xFF4CAF50), size: 28),
-              SizedBox(width: 12),
-              Text(
-                "Farmer Account Information",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D5F2E),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "Update your personal and farm details.",
-            style: TextStyle(fontSize: 14, color: Color(0xFF5F7D5F)),
-          ),
-          const SizedBox(height: 24),
-
-          // Personal Information Section
-          const Text(
-            "Personal Information",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D5F2E),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: farmerNameController,
-            decoration: const InputDecoration(
-              labelText: "Farmer Name",
-              prefixIcon: Icon(Icons.person),
-              border: OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF4CAF50), width: 2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: "Phone Number",
-                    prefixIcon: Icon(Icons.phone),
-                    border: OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Color(0xFF4CAF50),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: "Email",
-                    prefixIcon: Icon(Icons.email),
-                    border: OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Color(0xFF4CAF50),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 32),
-          const Divider(),
-          const SizedBox(height: 24),
-
-          // Farm Information Section
-          const Text(
-            "Farm Information",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D5F2E),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: farmNameController,
-            decoration: const InputDecoration(
-              labelText: "Farm Name",
-              prefixIcon: Icon(Icons.agriculture),
-              border: OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF4CAF50), width: 2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: farmLocationController,
-            decoration: const InputDecoration(
-              labelText: "Farm Location",
-              prefixIcon: Icon(Icons.location_on),
-              border: OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF4CAF50), width: 2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: farmSizeController,
-                  decoration: const InputDecoration(
-                    labelText: "Farm Size",
-                    prefixIcon: Icon(Icons.crop_square),
-                    border: OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Color(0xFF4CAF50),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextField(
-                  controller: cropsController,
-                  decoration: const InputDecoration(
-                    labelText: "Main Crops",
-                    prefixIcon: Icon(Icons.grass),
-                    border: OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Color(0xFF4CAF50),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
+          
+          const SizedBox(height: 48),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 50,
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.save),
-              label: const Text("Save Account Information"),
+              icon: const Icon(Icons.logout),
+              label: const Text("Log Out"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
+                backgroundColor: Colors.red.shade600,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Account information saved successfully!"),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
-              },
+              onPressed: () => _showLogoutDialog(context),
             ),
           ),
         ],
@@ -279,7 +99,267 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _preferencesCard() {
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Log Out"),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _logout(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Log Out"),
+          ),
+        ],
+      )
+    );
+  }
+
+  void _showUpdateEmailDialog(BuildContext context) {
+    final TextEditingController emailController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text("Update Email"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Enter your new email address. This may require recent authentication."),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: "New Email",
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: isLoading ? null : () async {
+                  if (emailController.text.isEmpty || !emailController.text.contains('@')) return;
+                  setState(() => isLoading = true);
+                  try {
+                    await FirebaseAuth.instance.currentUser?.verifyBeforeUpdateEmail(emailController.text.trim());
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Verification email sent to the new address.')),
+                      );
+                      // Force a rebuild to show changed email if it updates immediately
+                      this.setState(() {}); 
+                    }
+                  } on FirebaseAuthException catch (e) {
+                    setState(() => isLoading = false);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.message ?? 'An error occurred.')),
+                      );
+                    }
+                  }
+                },
+                child: isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text("Update"),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final TextEditingController passwordController = TextEditingController();
+    final TextEditingController confirmPasswordController = TextEditingController();
+    bool isLoading = false;
+    String? errorText;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text("Change Password"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Enter your new password below. This requires recent authentication."),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: "New Password",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: "Confirm Password",
+                    border: const OutlineInputBorder(),
+                    errorText: errorText,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: isLoading ? null : () async {
+                  if (passwordController.text.isEmpty) return;
+                  if (passwordController.text != confirmPasswordController.text) {
+                    setState(() => errorText = "Passwords do not match");
+                    return;
+                  }
+                  
+                  setState(() => isLoading = true);
+                  try {
+                    await FirebaseAuth.instance.currentUser?.updatePassword(passwordController.text);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Password updated successfully.')),
+                      );
+                    }
+                  } on FirebaseAuthException catch (e) {
+                    setState(() {
+                      isLoading = false;
+                      errorText = e.message;
+                    });
+                  }
+                },
+                child: isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text("Change"),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  void _showTermsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Terms & Privacy Policy"),
+        content: const SingleChildScrollView(
+          child: Text(
+            "Agrinetra Terms of Service and Privacy Policy\n\n"
+            "Last Updated: February 2026\n\n"
+            "By using Agrinetra, you agree to our data collection and map usage policies. "
+            "We collect field polygon data to provide agronomic insights. "
+            "We use OpenStreetMap and other open data sources and adhere to their usage guidelines. "
+            "Your data is completely private and not sold to third parties.\n\n"
+            "If you have further questions or wish to request data deletion, please contact support."
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      )
+    );
+  }
+
+  Widget _buildAccountSection() {
+    return _buildSectionCard(
+      title: "Account",
+      icon: Icons.account_circle,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Email Address",
+                  style: TextStyle(fontSize: 14, color: Color(0xFF5F7D5F)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  currentEmail,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2D5F2E),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.add_link),
+            label: const Text("Update Email"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4CAF50),
+              side: const BorderSide(color: Color(0xFF4CAF50)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            onPressed: () => _showUpdateEmailDialog(context),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.lock_reset),
+            label: const Text("Change Password"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4CAF50),
+              side: const BorderSide(color: Color(0xFF4CAF50)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            onPressed: () => _showChangePasswordDialog(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -291,12 +371,12 @@ class _SettingsPageState extends State<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.tune, color: Color(0xFF4CAF50), size: 28),
-              SizedBox(width: 12),
+            children: [
+              Icon(icon, color: const Color(0xFF4CAF50), size: 28),
+              const SizedBox(width: 12),
               Text(
-                "Preferences",
-                style: TextStyle(
+                title,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF2D5F2E),
@@ -304,98 +384,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            "Customize your app experience.",
-            style: TextStyle(fontSize: 14, color: Color(0xFF5F7D5F)),
-          ),
           const SizedBox(height: 24),
-
-          // Language Dropdown
-          DropdownButtonFormField<String>(
-            value: language,
-            decoration: const InputDecoration(
-              labelText: "Language",
-              prefixIcon: Icon(Icons.language),
-              border: OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF4CAF50), width: 2),
-              ),
-            ),
-            items: const [
-              DropdownMenuItem(value: "en", child: Text("English")),
-              DropdownMenuItem(value: "hi", child: Text("हिंदी (Hindi)")),
-              DropdownMenuItem(value: "ml", child: Text("മലയാളം (Malayalam)")),
-              DropdownMenuItem(value: "ta", child: Text("தமிழ் (Tamil)")),
-              DropdownMenuItem(value: "te", child: Text("తెలుగు (Telugu)")),
-            ],
-            onChanged: (value) {
-              setState(() {
-                language = value!;
-              });
-            },
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
-
-          const Text(
-            "Notifications",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D5F2E),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Push Notifications
-          SwitchListTile(
-            title: const Text(
-              "Push Notifications",
-              style: TextStyle(color: Color(0xFF2D5F2E)),
-            ),
-            subtitle: const Text(
-              "Receive all notifications",
-              style: TextStyle(color: Color(0xFF5F7D5F), fontSize: 12),
-            ),
-            value: pushNotifications,
-            activeColor: const Color(0xFF4CAF50),
-            onChanged: (val) => setState(() => pushNotifications = val),
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          // Weather Alerts
-          SwitchListTile(
-            title: const Text(
-              "Weather Alerts",
-              style: TextStyle(color: Color(0xFF2D5F2E)),
-            ),
-            subtitle: const Text(
-              "Get weather updates",
-              style: TextStyle(color: Color(0xFF5F7D5F), fontSize: 12),
-            ),
-            value: weatherAlerts,
-            activeColor: const Color(0xFF4CAF50),
-            onChanged: (val) => setState(() => weatherAlerts = val),
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          // Pest Alerts
-          SwitchListTile(
-            title: const Text(
-              "Pest Alerts",
-              style: TextStyle(color: Color(0xFF2D5F2E)),
-            ),
-            subtitle: const Text(
-              "Alerts for pest threats",
-              style: TextStyle(color: Color(0xFF5F7D5F), fontSize: 12),
-            ),
-            value: pestAlerts,
-            activeColor: const Color(0xFF4CAF50),
-            onChanged: (val) => setState(() => pestAlerts = val),
-            contentPadding: EdgeInsets.zero,
-          ),
+          ...children,
         ],
       ),
     );

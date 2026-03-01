@@ -52,7 +52,11 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
       _boundary = List.from(widget.field!.boundary);
       // Map existing crops to UiCrops
       _uiCrops = widget.field!.crops.map((c) => _UiCrop(
-        crop: Crop(name: c.name, plantingDate: c.plantingDate, harvestDate: c.harvestDate), // Deep copy
+        crop: Crop(
+          name: c.name, 
+          plantingDateStart: c.plantingDateStart, 
+          plantingDateEnd: c.plantingDateEnd
+        ), // Deep copy
         originalName: c.name,
         isNew: false
       )).toList();
@@ -209,8 +213,8 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
       _uiCrops.add(_UiCrop(
         crop: Crop(
           name: '', // Initially empty, must submit via dropdown
-          plantingDate: DateTime.now(), 
-          harvestDate: DateTime.now().add(const Duration(days: 90))
+          plantingDateStart: DateTime.now(), 
+          plantingDateEnd: DateTime.now().add(const Duration(days: 14)), 
         ),
         isNew: true
       ));
@@ -407,42 +411,25 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                                 children: [
                                   Expanded(
                                     child: TextFormField(
-                                      decoration: const InputDecoration(labelText: "Sowing Date"),
-                                      controller: TextEditingController(text: uiCrop.crop.plantingDate.toIso8601String().split('T')[0]),
+                                      decoration: const InputDecoration(labelText: "Sowing Window"),
+                                      controller: TextEditingController(
+                                        text: uiCrop.crop.plantingDateStart.toIso8601String().split('T')[0] == uiCrop.crop.plantingDateEnd.toIso8601String().split('T')[0] 
+                                          ? uiCrop.crop.plantingDateStart.toIso8601String().split('T')[0] 
+                                          : "${uiCrop.crop.plantingDateStart.toIso8601String().split('T')[0]} to ${uiCrop.crop.plantingDateEnd.toIso8601String().split('T')[0]}"
+                                      ),
                                       readOnly: true,
                                       onTap: () async {
                                          FocusScope.of(context).requestFocus(FocusNode());
-                                         DateTime? picked = await showDatePicker(
+                                         DateTimeRange? picked = await showDateRangePicker(
                                           context: context,
-                                          initialDate: uiCrop.crop.plantingDate,
+                                          initialDateRange: DateTimeRange(start: uiCrop.crop.plantingDateStart, end: uiCrop.crop.plantingDateEnd),
                                           firstDate: DateTime(2000),
                                           lastDate: DateTime(2030),
                                         );
                                         if(picked != null) {
                                           setState(() {
-                                            uiCrop.crop.plantingDate = picked;
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextFormField(
-                                      decoration: const InputDecoration(labelText: "Harvest Date"),
-                                      controller: TextEditingController(text: uiCrop.crop.harvestDate.toIso8601String().split('T')[0]),
-                                      readOnly: true,
-                                      onTap: () async {
-                                         FocusScope.of(context).requestFocus(FocusNode());
-                                         DateTime? picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: uiCrop.crop.harvestDate,
-                                          firstDate: DateTime(2000),
-                                          lastDate: DateTime(2030),
-                                        );
-                                        if(picked != null) {
-                                          setState(() {
-                                            uiCrop.crop.harvestDate = picked;
+                                            uiCrop.crop.plantingDateStart = picked.start;
+                                            uiCrop.crop.plantingDateEnd = picked.end;
                                           });
                                         }
                                       },

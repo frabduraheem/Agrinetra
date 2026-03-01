@@ -2,28 +2,36 @@ import 'package:latlong2/latlong.dart';
 
 class Crop {
   String name;
-  DateTime plantingDate;
-  DateTime harvestDate;
+  DateTime plantingDateStart;
+  DateTime plantingDateEnd;
 
   Crop({
     required this.name,
-    required this.plantingDate,
-    required this.harvestDate,
+    required this.plantingDateStart,
+    required this.plantingDateEnd,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'plantingDate': plantingDate.toIso8601String(),
-      'harvestDate': harvestDate.toIso8601String(),
+      'plantingDateStart': plantingDateStart.toIso8601String(),
+      'plantingDateEnd': plantingDateEnd.toIso8601String(),
     };
   }
 
   factory Crop.fromJson(Map<String, dynamic> json) {
+    // Fallback logic for backward compatibility with old local storage dates
+    DateTime pStart = json.containsKey('plantingDateStart') 
+        ? DateTime.parse(json['plantingDateStart']) 
+        : DateTime.parse(json['plantingDate']);
+    DateTime pEnd = json.containsKey('plantingDateEnd') 
+        ? DateTime.parse(json['plantingDateEnd']) 
+        : DateTime.parse(json['plantingDate']);
+    
     return Crop(
       name: json['name'],
-      plantingDate: DateTime.parse(json['plantingDate']),
-      harvestDate: DateTime.parse(json['harvestDate']),
+      plantingDateStart: pStart,
+      plantingDateEnd: pEnd,
     );
   }
 }

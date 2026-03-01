@@ -283,7 +283,7 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
                   urlTemplate: _isSatelliteView
                       ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
                       : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.app',
+                  userAgentPackageName: 'com.example.agrinetra',
                 ),
                 if (_isSatelliteView) ...[
                   // Road Network (Thick lines)
@@ -291,14 +291,14 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
                     urlTemplate:
                         'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
                     backgroundColor: Colors.transparent,
-                    userAgentPackageName: 'com.example.app',
+                    userAgentPackageName: 'com.example.agrinetra',
                   ),
                   // Bold Place Names & Labels
                   TileLayer(
                     urlTemplate:
                         'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                     backgroundColor: Colors.transparent,
-                    userAgentPackageName: 'com.example.app',
+                    userAgentPackageName: 'com.example.agrinetra',
                   ),
                 ],
                 // Existing Polygons Layer

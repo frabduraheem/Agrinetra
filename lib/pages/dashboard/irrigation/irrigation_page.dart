@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../dashboard_layout.dart';
+import '../../../models/field_model.dart';
+import '../../../services/field_service.dart';
 
 class IrrigationPage extends StatefulWidget {
   const IrrigationPage({super.key});
@@ -9,98 +12,112 @@ class IrrigationPage extends StatefulWidget {
 }
 
 class _IrrigationPageState extends State<IrrigationPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _cropTypeController = TextEditingController();
-  final _fieldConditionsController = TextEditingController();
-  final _weatherForecastController = TextEditingController();
-  final _historicalDataController = TextEditingController();
+  bool _isLoading = true;
+  List<Field> _fields = [];
 
-  bool _isLoading = false;
-  Map<String, String>? _scheduleData;
-  String? _errorMessage;
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
-  Future<void> _generateSchedule() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _scheduleData = null;
-    });
-
-    try {
-      await Future.delayed(const Duration(seconds: 2));
-
-      _scheduleData = {
-        "schedule": "Water field every 3 days at 6 AM, 1500L per hectare",
-        "forecastAdjustments":
-            "Reduce watering by 10% due to upcoming rainfall on Wednesday",
-        "additionalNotes": "Monitor soil moisture daily for best results",
-      };
-    } catch (e) {
-      _errorMessage = "Failed to generate schedule. Try again.";
-    } finally {
+  Future<void> _loadData() async {
+    await FieldService().loadFields();
+    final loadedFields = FieldService().getFields();
+    
+    if (mounted) {
       setState(() {
+        _fields = loadedFields;
         _isLoading = false;
       });
     }
   }
 
-  @override
-  void dispose() {
-    _cropTypeController.dispose();
-    _fieldConditionsController.dispose();
-    _weatherForecastController.dispose();
-    _historicalDataController.dispose();
-    super.dispose();
-  }
-
-  Widget _buildTextField({
-    required String label,
-    required String hint,
-    required TextEditingController controller,
-    int maxLines = 1,
+  Widget _buildResultCard({
+    required String title,
+    required String advice,
+    required String status,
+    required double deficit,
+    required String crop,
   }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        border: const OutlineInputBorder(),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF4CAF50), width: 2),
-        ),
-      ),
-      validator: (value) =>
-          value == null || value.isEmpty ? 'This field is required' : null,
-    );
-  }
-
-  Widget _buildResultCard(String title, String content) {
+    final bool requiresWater = deficit > 0;
+    
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      width: 380,
+      margin: const EdgeInsets.only(bottom: 16, right: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFD4E7D4),
+        color: requiresWater ? Colors.orange.shade50 : const Color(0xFFD4E7D4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        border: Border.all(color: requiresWater ? Colors.orange.shade200 : const Color(0xFFC8E6C9)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Color(0xFF2D5F2E),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: requiresWater ? Colors.orange.shade900 : const Color(0xFF2D5F2E),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: requiresWater ? Colors.orange.shade100 : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  crop,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: requiresWater ? Colors.orange.shade900 : const Color(0xFF2D5F2E),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          
+          Row(
+            children: [
+              Icon(
+                requiresWater ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                color: requiresWater ? Colors.orange.shade700 : const Color(0xFF4CAF50),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                status,
+                style: TextStyle(
+                  fontSize: 14, 
+                  fontWeight: FontWeight.bold,
+                  color: requiresWater ? Colors.orange.shade800 : const Color(0xFF2D5F2E),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (requiresWater)
+             Text(
+                "Action Required: Apply ${deficit.toStringAsFixed(1)}mm of water per hectare.",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade900,
+                ),
+             ),
+             
+          if (requiresWater) const SizedBox(height: 8),
+
           Text(
-            content,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF5F7D5F)),
+            advice,
+            style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
           ),
         ],
       ),
@@ -111,11 +128,13 @@ class _IrrigationPageState extends State<IrrigationPage> {
   Widget build(BuildContext context) {
     return DashboardLayout(
       currentPage: 'Irrigation',
-      child: Column(
+      child: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF2D5F2E)))
+        : Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Personalized Irrigation Guidance",
+            "Algorithmic Irrigation Guidance",
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -124,127 +143,77 @@ class _IrrigationPageState extends State<IrrigationPage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "Generate a tailored irrigation schedule using AI.",
+            "Dynamic watering schedules calculated strictly using Penman-Monteith Evapotranspiration (ET0) and 14-day rainfall models.",
             style: TextStyle(fontSize: 16, color: Color(0xFF5F7D5F)),
           ),
           const SizedBox(height: 32),
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                _buildTextField(
-                  label: "Crop Type",
-                  hint: "e.g., Corn, Wheat, Tomatoes",
-                  controller: _cropTypeController,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  label: "Field Conditions",
-                  hint: "e.g., Loamy soil, 40% moisture",
-                  controller: _fieldConditionsController,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  label: "7-Day Weather Forecast",
-                  hint: "e.g., Avg temp 25°C, 10mm rain expected, 60% humidity",
-                  controller: _weatherForecastController,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  label: "Historical Data",
-                  hint:
-                      "e.g., Last watered 3 days ago, 2000L. Previous yield: 5 tons/acre.",
-                  controller: _historicalDataController,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                if (_errorMessage != null)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error, color: Colors.red),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.schedule),
-                    label: const Text("Generate Schedule"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: _isLoading ? null : _generateSchedule,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (_scheduleData != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildResultCard("Schedule", _scheduleData!["schedule"]!),
-                _buildResultCard(
-                  "Forecast Adjustments",
-                  _scheduleData!["forecastAdjustments"]!,
-                ),
-                _buildResultCard(
-                  "Additional Notes",
-                  _scheduleData!["additionalNotes"]!,
-                ),
-              ],
-            )
+          
+          if (_fields.isEmpty)
+              const Text("No active fields to schedule. Please add fields in the Field Management tab.", style: TextStyle(color: Colors.grey))
           else
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
-              ),
-              child: Column(
-                children: const [
-                  Icon(Icons.info_outline, size: 48, color: Color(0xFF5F7D5F)),
-                  SizedBox(height: 16),
-                  Text(
-                    "Your irrigation schedule will appear here.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF5F7D5F), fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
+             Wrap(
+               children: _fields.map<Widget>((field) {
+                  return StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance.collection('plots').doc(field.id).snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || !snapshot.data!.exists) {
+                         return const SizedBox.shrink();
+                      }
+                      
+                      final data = snapshot.data!.data() as Map<String, dynamic>?;
+                      if (data == null || !data.containsKey('analysis')) {
+                         return const SizedBox.shrink();
+                      }
+                      
+                      final analysis = data['analysis'] as Map<String, dynamic>;
+                      final v2Report = analysis['v2_engine_report'] as Map<String, dynamic>?;
+                      
+                      if (v2Report == null) {
+                         return const SizedBox.shrink();
+                      }
+                      
+                      final focusedAnalysis = v2Report['focused_analysis'] as Map<String, dynamic>?;
+                      
+                      if (focusedAnalysis == null || !focusedAnalysis.containsKey('irrigation') || focusedAnalysis['irrigation'] == null) {
+                         String? sysMsg = v2Report['system_message'] as String?;
+                         if (sysMsg != null && sysMsg.contains("Non-arable")) {
+                            return _buildResultCard(
+                               title: field.name,
+                               crop: "None (Invalid Land)",
+                               advice: "Engine Override: $sysMsg",
+                               status: "Non-Arable Region",
+                               deficit: 0.0,
+                            );
+                         }
+                         return const SizedBox.shrink();
+                      }
+                      
+                      // Safety type cast incase it failed formatting
+                      dynamic irrigation = focusedAnalysis['irrigation'];
+                      if (irrigation is String) {
+                         // Fallback if the engine couldn't calculate it
+                         return _buildResultCard(
+                            title: field.name,
+                            crop: focusedAnalysis['crop'] ?? "Unknown",
+                            advice: irrigation,
+                            status: "Analysis Incomplete",
+                            deficit: 0.0,
+                         );
+                      }
+                      
+                      final iMap = irrigation as Map<String, dynamic>;
+                      
+                      return _buildResultCard(
+                        title: field.name,
+                        crop: focusedAnalysis['crop'] ?? "Unknown",
+                        status: iMap['status'] ?? "Analyzed",
+                        deficit: (iMap['deficit_mm'] ?? 0.0).toDouble(),
+                        advice: iMap['advice'] ?? "No advice provided.",
+                      );
+                    },
+                  );
+               }).toList(),
+             )
         ],
       ),
     );
