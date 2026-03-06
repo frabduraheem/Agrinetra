@@ -102,13 +102,16 @@ class _FarmMapWidgetState extends State<FarmMapWidget> {
               userAgentPackageName: 'com.example.agrinetra',
             ),
             PolygonLayer(
-              polygons: _fields.map((field) => Polygon(
-                points: field.boundary,
-                color: field.isCultivated 
-                    ? Colors.green.withOpacity(0.4) 
-                    : Colors.brown.withOpacity(0.4),
-                isFilled: true,
-              )).toList(),
+              polygons: _fields.map((field) {
+                final baseColor = Colors.primaries[field.name.hashCode.abs() % Colors.primaries.length];
+                return Polygon(
+                  points: field.boundary,
+                  color: baseColor.withOpacity(0.4),
+                  borderColor: baseColor,
+                  borderStrokeWidth: 4,
+                  isFilled: true,
+                );
+              }).toList(),
             ),
             MarkerLayer(
               markers: _fields.map((field) {

@@ -303,13 +303,16 @@ class _MapDrawingScreenState extends State<MapDrawingScreen> {
                 ],
                 // Existing Polygons Layer
                 PolygonLayer(
-                  polygons: widget.existingFields.map((field) => Polygon(
-                    points: field.boundary,
-                    color: Colors.red.withOpacity(0.3), // Occupied area
-                    borderColor: Colors.red,
-                    borderStrokeWidth: 2,
-                    isFilled: true,
-                  )).toList(),
+                  polygons: widget.existingFields.map((field) {
+                    final baseColor = Colors.primaries[field.name.hashCode.abs() % Colors.primaries.length];
+                    return Polygon(
+                      points: field.boundary,
+                      color: baseColor.withOpacity(0.3), // Occupied area
+                      borderColor: baseColor,
+                      borderStrokeWidth: 4,
+                      isFilled: true,
+                    );
+                  }).toList(),
                 ),
                 // Labels for Existing Fields
                 MarkerLayer(

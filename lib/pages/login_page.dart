@@ -114,6 +114,11 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 100, // Adjust size as necessary
+                ),
+                const SizedBox(height: 16),
                 Text(
                   "Login to Agrinetra",
                   style: theme.textTheme.headlineMedium?.copyWith(

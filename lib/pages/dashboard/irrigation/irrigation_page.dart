@@ -166,7 +166,7 @@ class _IrrigationPageState extends State<IrrigationPage> {
                       }
                       
                       final analysis = data['analysis'] as Map<String, dynamic>;
-                      final v2Report = analysis['v2_engine_report'] as Map<String, dynamic>?;
+                      final v2Report = analysis['engine_report'] as Map<String, dynamic>?;
                       
                       if (v2Report == null) {
                          return const SizedBox.shrink();

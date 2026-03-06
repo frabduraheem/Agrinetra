@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-// TODO: Run `flutterfire configure` to generate this file
 import 'firebase_options.dart'; 
 import 'pages/welcome_page.dart';
 import 'pages/login_page.dart';
@@ -11,7 +10,6 @@ import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // TODO: Uncomment the following lines after running `flutterfire configure`
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

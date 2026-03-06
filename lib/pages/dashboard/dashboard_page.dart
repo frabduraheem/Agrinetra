@@ -136,7 +136,7 @@ class _FieldInsightCard extends StatelessWidget {
 
         if (analysis != null) {
           // V2 Structure Parsing
-          final v2Report = analysis['v2_engine_report'] as Map<String, dynamic>?;
+          final v2Report = analysis['engine_report'] as Map<String, dynamic>?;
           currentV2Report = v2Report;
           
           if (v2Report != null) {

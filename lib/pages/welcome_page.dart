@@ -14,6 +14,11 @@ class WelcomePage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Image.asset(
+                'assets/images/logo.png',
+                height: 120, // Adjust size as necessary
+              ),
+              const SizedBox(height: 24),
               Text(
                 "Welcome to Agrinetra",
                 style: theme.textTheme.headlineMedium?.copyWith(
