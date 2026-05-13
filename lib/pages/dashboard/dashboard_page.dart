@@ -221,8 +221,7 @@ class _FieldInsightCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildMiniMetric(Icons.water_drop, "Moisture", moisture),
-              _buildMiniMetric(Icons.health_and_safety, "Health", healthStatus),
+              _buildMiniMetric(Icons.water_drop, "Moisture", moisture)
             ],
           ),
           
