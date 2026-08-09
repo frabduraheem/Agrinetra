@@ -312,6 +312,9 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                            }
                            _uiCrops.clear(); 
                          }
+                         else{
+                          _addCrop();
+                         }
                       });
                     },
                     secondary: const Icon(Icons.grass),
@@ -324,11 +327,12 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                       children: [
                          const Text('Crops:',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                         TextButton.icon(
-                           onPressed: _addCrop,
-                           icon: const Icon(Icons.add),
-                           label: const Text('Add Crop'),
-                         ),
+                        // code for mltiple crops in same field
+                        //  TextButton.icon(
+                        //    onPressed: _addCrop,
+                        //    icon: const Icon(Icons.add),
+                        //    label: const Text('Add Crop'),
+                        //  ),
                       ],
                     ),
                     if (_isLoadingCrops) 
@@ -353,10 +357,11 @@ class _AddEditFieldPageState extends State<AddEditFieldPage> {
                                 children: [
                                   Text("Crop #${index+1}", style: const TextStyle(fontWeight: FontWeight.bold)),
                                   const Spacer(),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => _removeCrop(index),
-                                  ),
+                                  // code for removing crop, no necessarry till multiple crops are implemented
+                                  // IconButton(
+                                  //   icon: const Icon(Icons.delete, color: Colors.red),
+                                  //   onPressed: () => _removeCrop(index),
+                                  // ),
                                 ],
                               ),
                               LayoutBuilder(
